@@ -17,17 +17,19 @@ import { IInitData } from 'vs/workbench/api/common/extHost.protocol';
 import { MessageType, createMessageOfType, isMessageOfType, IExtHostSocketMessage, IExtHostReadyMessage, IExtHostReduceGraceTimeMessage, ExtensionHostExitCode } from 'vs/workbench/services/extensions/common/extensionHostProtocol';
 import { ExtensionHostMain, IExitFn } from 'vs/workbench/services/extensions/common/extensionHostMain';
 import { VSBuffer } from 'vs/base/common/buffer';
-import { IURITransformer, URITransformer, IRawURITransformer } from 'vs/base/common/uriIpc';
+import { IRawURITransformer, IURITransformer, URITransformer } from 'vs/base/common/uriIpc';
 import { Promises } from 'vs/base/node/pfs';
+import { createServerURITransformer } from 'vs/base/common/uriServer';
 import { realpath } from 'vs/base/node/extpath';
 import { IHostUtils } from 'vs/workbench/api/common/extHostExtensionService';
 import { RunOnceScheduler } from 'vs/base/common/async';
 import { boolean } from 'vs/editor/common/config/editorOptions';
+import * as proxyAgent from 'vs/base/node/proxy_agent';
 
 import 'vs/workbench/api/common/extHost.common.services';
 import 'vs/workbench/api/node/extHost.node.services';
 
-interface ParsedExtHostArgs {
+export interface ParsedExtHostArgs {
 	uriTransformerPath?: string;
 	skipWorkspaceStorageLock?: boolean;
 	useHostProxy?: string;
@@ -99,6 +101,7 @@ interface IRendererConnection {
 // This calls exit directly in case the initialization is not finished and we need to exit
 // Otherwise, if initialization completed we go to extensionHostMain.terminate()
 let onTerminate = function (reason: string) {
+	console.log(`>>>>> TERMINATE ${reason}`);
 	nativeExit();
 };
 
@@ -122,19 +125,27 @@ function _createExtHostProtocol(): Promise<PersistentProtocol> {
 				if (msg && msg.type === 'VSCODE_EXTHOST_IPC_SOCKET') {
 					const initialDataChunk = VSBuffer.wrap(Buffer.from(msg.initialDataChunk, 'base64'));
 					let socket: NodeSocket | WebSocketNodeSocket;
+
+					console.log('>>> GOT HANDLE');
 					if (msg.skipWebSocketFrames) {
+						console.log('>>> SKIP WEBSOCKET FRAMES');
 						socket = new NodeSocket(handle);
 					} else {
+						console.log('>>>KEEP WEBSOCKET FRAMES');
 						const inflateBytes = VSBuffer.wrap(Buffer.from(msg.inflateBytes, 'base64'));
 						socket = new WebSocketNodeSocket(new NodeSocket(handle), msg.permessageDeflate, inflateBytes, false);
 					}
 					if (protocol) {
+						console.log('>>> RECONNECTING', protocol.constructor.name);
+
 						// reconnection case
 						disconnectRunner1.cancel();
 						disconnectRunner2.cancel();
 						protocol.beginAcceptReconnection(socket, initialDataChunk);
 						protocol.endAcceptReconnection();
 					} else {
+						console.log('>>> CONNECTING');
+
 						clearTimeout(timer);
 						protocol = new PersistentProtocol(socket, initialDataChunk);
 						protocol.onDidDispose(() => onTerminate('renderer disconnected'));
@@ -142,7 +153,7 @@ function _createExtHostProtocol(): Promise<PersistentProtocol> {
 
 						// Wait for rich client to reconnect
 						protocol.onSocketClose(() => {
-							// The socket has closed, let's give the renderer a certain amount of time to reconnect
+							console.log('>>>  Wait for rich client to reconnect');
 							disconnectRunner1.schedule();
 						});
 					}
@@ -319,6 +330,9 @@ function connectToRenderer(protocol: IMessagePassingProtocol): Promise<IRenderer
 }
 
 export async function startExtensionHostProcess(): Promise<void> {
+	// NOTE@coder: add proxy agent patch
+	proxyAgent.monkeyPatch(true);
+
 	performance.mark(`code/extHost/willConnectToRenderer`);
 	const protocol = await createExtHostProtocol();
 	performance.mark(`code/extHost/didConnectToRenderer`);
@@ -340,13 +354,18 @@ export async function startExtensionHostProcess(): Promise<void> {
 
 	// Attempt to load uri transformer
 	let uriTransformer: IURITransformer | null = null;
-	if (initData.remote.authority && args.uriTransformerPath) {
-		try {
-			const rawURITransformerFactory = <any>require.__$__nodeRequire(args.uriTransformerPath);
-			const rawURITransformer = <IRawURITransformer>rawURITransformerFactory(initData.remote.authority);
-			uriTransformer = new URITransformer(rawURITransformer);
-		} catch (e) {
-			console.error(e);
+
+	if (initData.remote.authority) {
+		if (args.uriTransformerPath) {
+			try {
+				const rawURITransformerFactory = <any>require.__$__nodeRequire(args.uriTransformerPath);
+				const rawURITransformer = <IRawURITransformer>rawURITransformerFactory(initData.remote.authority);
+				uriTransformer = new URITransformer(rawURITransformer);
+			} catch (e) {
+				console.error(e);
+			}
+		} else {
+			uriTransformer = createServerURITransformer(initData.remote.authority);
 		}
 	}
 
