@@ -21,3 +21,9 @@
 # These files are not linted by `yarn eslint`, so we exclude them from being linted in the editor.
 # This ensures that if we add new rules and they pass CI, the are also no errors in the editor.
 /resources/web/code-web.js
+
+# These are code-server code symlinks.
+src/vs/base/common/util.ts
+src/vs/base/common/ipc.d.ts
+src/vs/base/node/proxy_agent.ts
+src/vs/server/uriTransformer.ts

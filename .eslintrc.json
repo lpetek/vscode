@@ -833,6 +833,7 @@
 					"**/vs/platform/**/{common,node}/**",
 					"**/vs/workbench/**/{common,node}/**",
 					"**/vs/server/**",
+					"@coder/logger", // NOTE@coder: add logger
 					"@vscode/*", "*" // node modules
 				]
 			},
