@@ -65,6 +65,7 @@ import { IWorkspaceTrustEnablementService, IWorkspaceTrustManagementService } fr
 import { HTMLFileSystemProvider } from 'vs/platform/files/browser/htmlFileSystemProvider';
 import { IOpenerService } from 'vs/platform/opener/common/opener';
 import { safeStringify } from 'vs/base/common/objects';
+import { initialize } from './client';
 
 class BrowserMain extends Disposable {
 
@@ -96,6 +97,9 @@ class BrowserMain extends Disposable {
 
 		// Startup
 		const instantiationService = workbench.startup();
+
+		// NOTE@coder: initialize our additions
+		await initialize(services.serviceCollection);
 
 		// Window
 		this._register(instantiationService.createInstance(BrowserWindow));
