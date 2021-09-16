@@ -98,8 +98,8 @@ class BrowserMain extends Disposable {
 		// Startup
 		const instantiationService = workbench.startup();
 
-		// NOTE@coder: initialize our additions
-		await initialize(services.serviceCollection);
+		/** @coder Initialize our own client-side additions. */
+		await initialize(services.serviceCollection, this.configuration);
 
 		// Window
 		this._register(instantiationService.createInstance(BrowserWindow));

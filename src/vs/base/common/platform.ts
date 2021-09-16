@@ -3,6 +3,10 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+// eslint-disable-next-line code-import-patterns
+import { IWorkbenchConfigurationSerialized } from 'vs/platform/workspaces/common/workbench';
+import { isInternalConfiguration } from 'vs/base/common/nls';
+
 const LANGUAGE_DEFAULT = 'en';
 
 let _isWindows = false;
@@ -84,15 +88,24 @@ if (typeof navigator === 'object' && !isElectronRenderer) {
 	_language = _locale;
 
 	// NOTE@coder: Make languages work.
-	const el = typeof document !== 'undefined' && document.getElementById('vscode-remote-nls-configuration');
-	const rawNlsConfig = el && el.getAttribute('data-settings');
-	if (rawNlsConfig) {
+	const el = typeof document !== 'undefined' && document.getElementById('vscode-workbench-web-configuration');
+	const rawWorkbenchConfig = el && el.getAttribute('data-settings');
+
+	if (rawWorkbenchConfig) {
 		try {
-			const nlsConfig: NLSConfig = JSON.parse(rawNlsConfig);
-			_locale = nlsConfig.locale;
-			_translationsConfigFile = nlsConfig._translationsConfigFile;
-			_language = nlsConfig.availableLanguages['*'] || LANGUAGE_DEFAULT;
-		} catch (error) { /* Oh well. */ }
+			const workbenchConfig: IWorkbenchConfigurationSerialized = JSON.parse(rawWorkbenchConfig);
+			const { nlsConfiguration } = workbenchConfig;
+
+			_locale = nlsConfiguration.locale;
+
+			if (isInternalConfiguration(nlsConfiguration)) {
+				_translationsConfigFile = nlsConfiguration._translationsConfigFile;
+			}
+
+			_language = nlsConfiguration.availableLanguages['*'] || LANGUAGE_DEFAULT;
+		} catch (error) {
+			/* Oh well. */
+		}
 	}
 }
 

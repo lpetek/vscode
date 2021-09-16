@@ -260,10 +260,13 @@ const mapExtToTextMimes: MapExtToMediaMimes = {
 	'.html': 'text/html',
 	'.ics': 'text/calendar',
 	'.js': 'text/javascript',
+	'.json': 'application/json',
 	'.mjs': 'text/javascript',
 	'.txt': 'text/plain',
-	'.xml': 'text/xml'
+	'.xml': 'text/xml',
 };
+
+export const PLAIN_TEXT_MIME_TYPE = 'text/plain';
 
 // Known media mimes that we can handle
 const mapExtToMediaMimes: MapExtToMediaMimes = {

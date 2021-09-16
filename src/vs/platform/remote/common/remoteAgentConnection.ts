@@ -25,7 +25,11 @@ export const enum ConnectionType {
 	Tunnel = 3,
 }
 
-function connectionTypeToString(connectionType: ConnectionType): string {
+/**
+ * Converts a connection type enum to log-friendly string.
+ * @coder exported for server-side use.
+ */
+export function connectionTypeToString(connectionType: ConnectionType): string {
 	switch (connectionType) {
 		case ConnectionType.Management:
 			return 'Management';
@@ -46,6 +50,15 @@ export interface SignRequest {
 	data: string;
 }
 
+/**
+ * Expected response from `CodeServer` connection.
+ * @coder Moved from inline type for use outside this module.
+ */
+export interface DebugMessage {
+	type: 'debug';
+	debugPort?: NonNullable<IRemoteExtensionHostStartParams['port']>;
+}
+
 export interface ConnectionTypeRequest {
 	type: 'connectionType';
 	commit?: string;
@@ -63,8 +76,7 @@ export interface OKMessage {
 	type: 'ok';
 }
 
-export type HandshakeMessage = AuthRequest | SignRequest | ConnectionTypeRequest | ErrorMessage | OKMessage;
-
+export type HandshakeMessage = AuthRequest | SignRequest | ConnectionTypeRequest | ErrorMessage | OKMessage | DebugMessage;
 
 interface ISimpleConnectionOptions {
 	commit: string | undefined;

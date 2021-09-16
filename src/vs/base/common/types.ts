@@ -272,6 +272,11 @@ export type Dto<T> = T extends { toJSON(): infer U }
 	? { [k in keyof T]: Dto<T[k]>; }
 	: T;
 
+/**
+ * Marks readonly properties as wriatable.
+ */
+export type Writeable<T> = { -readonly [P in keyof T]: T[P] };
+
 export function NotImplementedProxy<T>(name: string): { new(): T } {
 	return <any>class {
 		constructor() {

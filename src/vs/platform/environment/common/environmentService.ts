@@ -159,18 +159,21 @@ export abstract class AbstractNativeEnvironmentService implements INativeEnviron
 	}
 
 	/**
-	 * NOTE@coder: add extraExtensionPaths and extraBuiltinExtensionPaths
+	 * @coder Extra extensions path from initial arguments.
 	 */
 	@memoize
 	get extraExtensionPaths(): string[] {
-		return (this._args['extra-extensions-dir'] || []).map((p) => resolve(p));
+		return (this.args['extra-extensions-dir'] || []).map((p) => resolve(p));
 	}
 
+	/**
+	 * @coder Extra built-in extensions paths from initial arguments.
+	 */
 	@memoize
 	get extraBuiltinExtensionPaths(): string[] {
-		return (this._args['extra-builtin-extensions-dir'] || []).map((p) => resolve(p));
+		return (this.args['extra-builtin-extensions-dir'] || []).map((p) => resolve(p));
 	}
- 
+
 	@memoize
 	get extensionDevelopmentLocationURI(): URI[] | undefined {
 		const extensionDevelopmentPaths = this.args.extensionDevelopmentPath;

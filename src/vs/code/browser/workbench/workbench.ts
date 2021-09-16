@@ -12,11 +12,12 @@ import { Schemas } from 'vs/base/common/network';
 import { isEqual } from 'vs/base/common/resources';
 import { URI, UriComponents } from 'vs/base/common/uri';
 import { generateUuid } from 'vs/base/common/uuid';
+import { IWorkbenchConfigurationSerialized } from 'vs/platform/workspaces/common/workbench';
 import { request } from 'vs/base/parts/request/browser/request';
 import { localize } from 'vs/nls';
 import product from 'vs/platform/product/common/product';
 import { isFolderToOpen, isWorkspaceToOpen } from 'vs/platform/windows/common/windows';
-import { create, ICredentialsProvider, IProductQualityChangeHandler, ISettingsSyncOptions, IURLCallbackProvider, IWindowIndicator, IWorkbenchConstructionOptions, IWorkspace, IWorkspaceProvider } from 'vs/workbench/workbench.web.api';
+import { create, ICredentialsProvider, IProductQualityChangeHandler, ISettingsSyncOptions, IURLCallbackProvider, IWindowIndicator, IWorkspace, IWorkspaceProvider } from 'vs/workbench/workbench.web.api';
 
 function doCreateUri(path: string, queryValues: Map<string, string>): URI {
 	let query: string | undefined = undefined;
@@ -41,7 +42,7 @@ function doCreateUri(path: string, queryValues: Map<string, string>): URI {
  * Encode a path for opening via the folder or workspace query parameter. This
  * preserves slashes so it can be edited by hand more easily.
  */
- export const encodePath = (path: string): string => {
+export const encodePath = (path: string): string => {
 	return path.split('/').map((p) => encodeURIComponent(p)).join('/');
 };
 
@@ -424,7 +425,7 @@ class WindowIndicator implements IWindowIndicator {
 		throw new Error('Missing web configuration element');
 	}
 
-	const config: IWorkbenchConstructionOptions & { folderUri?: UriComponents, workspaceUri?: UriComponents } = {
+	const config: IWorkbenchConfigurationSerialized = {
 		webviewEndpoint: `${window.location.origin}${window.location.pathname.replace(/\/+$/, '')}/webview`,
 		...JSON.parse(configElementAttribute),
 	};
