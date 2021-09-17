@@ -4,12 +4,15 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { createReadStream, promises as fs, readFileSync } from 'fs';
-import { IncomingMessage, ServerResponse } from 'http';
+import { Server, IncomingMessage, ServerResponse } from 'http';
+import { match, MatchFunction, MatchResult } from 'path-to-regexp';
 import { join, normalize } from 'path';
 import { UriComponents } from 'vs/base/common/uri';
 import { getMediaOrTextMime, PLAIN_TEXT_MIME_TYPE } from '../../base/common/mime';
 import { ProtocolConstants } from '../../base/parts/ipc/common/ipc.net';
 import { AbstractNetRequestHandler, escapeJSON, ParsedRequest } from './abstractNetRequestHandler';
+import { IEnvironmentServerService } from 'vs/server/services/environmentService';
+import { ILogService } from 'vs/platform/log/common/log';
 
 const APP_ROOT = join(__dirname, '..', '..', '..', '..');
 
@@ -49,7 +52,11 @@ interface Callback {
 	timeout: NodeJS.Timeout;
 }
 
-export type WebRequestListener = (req: ParsedRequest, res: ServerResponse) => void | Promise<void>;
+export type WebRequestListener<T extends object | null = null> = T extends object
+	? (req: ParsedRequest, res: ServerResponse, params: MatchResult<T>['params']) => void | Promise<void>
+	: (req: ParsedRequest, res: ServerResponse) => void | Promise<void>;
+
+const matcherOptions = { encode: encodeURI, decode: decodeURIComponent };
 
 export class WebRequestHandler extends AbstractNetRequestHandler<WebRequestListener> {
 	/** Stored callback URI's sent over from client-side `PollingURLCallbackProvider`. */
@@ -66,43 +73,37 @@ export class WebRequestHandler extends AbstractNetRequestHandler<WebRequestListe
 	 * Event listener which handles all incoming requests.
 	 */
 	protected eventListener: WebRequestListener = async (req, res) => {
-		const { pathname } = req.parsedUrl;
-
 		res.setHeader('Access-Control-Allow-Origin', '*');
 
 		try {
-			if (/(\/static)?\/favicon\.ico/.test(pathname)) {
-				return this.serveFile(req, res, paths.FAVICON);
-			}
-			if (/(\/static)?\/manifest\.json/.test(pathname)) {
-				return this.$manifest(req, res);
-			}
+			for (const [pattern, handler] of this.routes.entries()) {
+				const handled = await this.route(req, res, pattern, handler);
 
-			if (/^\/static\//.test(pathname)) {
-				return this.$static(req, res);
-			}
-
-			// if (/^\/webview\//.test(pathname)) {
-			// 	return this.$webview(req, res);
-			// }
-
-			switch (pathname) {
-				case '/':
-					return this.$root(req, res);
-				case '/callback':
-					return this.$callback(req, res);
-				case '/fetch-callback':
-					return this.$fetchCallback(req, res);
-				case '/vscode-remote-resource':
-					return this.$remoteResource(req, res);
-				default:
-					return this.serveError(req, res, 404, 'Not found.');
+				if (handled) {
+					return;
+				}
 			}
 		} catch (error: any) {
 			this.logService.error(error);
 
 			return this.serveError(req, res, 500, 'Internal Server Error.');
 		}
+
+		return this.serveError(req, res, 404, 'Not found.');
+	};
+
+	/**
+	 * Attempts to match a route with a given pattern.
+	 */
+	private route = async (req: ParsedRequest, res: ServerResponse, pattern: MatchFunction, handler: WebRequestListener<any>) => {
+		const match = pattern(req.parsedUrl.pathname);
+
+		if (match) {
+			await handler(req, res, match.params);
+			return true;
+		}
+
+		return false;
 	};
 
 	/**
@@ -130,13 +131,8 @@ export class WebRequestHandler extends AbstractNetRequestHandler<WebRequestListe
 	/**
 	 * Static files endpoint.
 	 */
-	private $static: WebRequestListener = async (req, res) => {
-		const { parsedUrl } = req;
-
-		// Strip `/static/` from the path
-		const relativeFilePath = normalize(decodeURIComponent(parsedUrl.pathname.substr('/static/'.length)));
-
-		return this.serveFile(req, res, join(APP_ROOT, relativeFilePath));
+	private $static: WebRequestListener<string[]> = async (req, res, params) => {
+		return this.serveFile(join(APP_ROOT, params[0]), req, res,);
 	};
 
 	/**
@@ -157,6 +153,7 @@ export class WebRequestHandler extends AbstractNetRequestHandler<WebRequestListe
 
 		const headers = {
 			'Content-Type': 'text/html',
+			// TODO: investigate why this breaks the the extensions tab.
 			'Content-Security-Policy': `require-trusted-types-for 'script';`,
 		};
 
@@ -181,7 +178,7 @@ export class WebRequestHandler extends AbstractNetRequestHandler<WebRequestListe
 			return res.end('Bad request.');
 		}
 
-		// merge over additional query values that we got.
+		// Merge over additional query values that we got.
 		let query = new URLSearchParams(vscodeQuery || '');
 
 		for (const key in query.keys()) {
@@ -234,7 +231,7 @@ export class WebRequestHandler extends AbstractNetRequestHandler<WebRequestListe
 
 	/**
 	 * Remote resource endpoint.
-	 * @remark Used to load resources on the client-side.
+	 * @remark Used to load resources on the client-side. See `FileAccessImpl` for details.
 	 */
 	private $remoteResource: WebRequestListener = async (req, res) => {
 		const path = req.parsedUrl.searchParams.get('path');
@@ -245,20 +242,30 @@ export class WebRequestHandler extends AbstractNetRequestHandler<WebRequestListe
 		}
 	};
 
-	// /**
-	//  * Webview endpoint
-	//  */
-	// private $webview: WebRequestListener = async (req, res) => {
+	/**
+	 * Webview endpoint
+	 */
+	private $webview: WebRequestListener<string[]> = async (req, res, params) => {
+		return this.serveFile(join(paths.WEBVIEW, params[0]), req, res);
+	};
+
+	/**
+	 * Webview Resource endpoint
+	 */
+	//  private $webviewResource: WebRequestListener = async (req, res) => {
 	// 	const foo = req.parsedUrl.pathname.foo;
 
-	// 	if (/^vscode-resource/.test(foo)) {
+	// 	if (/^/.test(foo)) {
 	// 		return this.serveFile(req, res, foo.replace(/^vscode-resource(\/file)?/, ''));
 	// 	}
 
 	// 	return this.serveFile(req, res, join(paths.WEBVIEW, foo));
 	// };
 
-	serveFile = async (req: IncomingMessage, res: ServerResponse, filePath: string, responseHeaders = Object.create(null)): Promise<void> => {
+
+	serveFile = async (filePath: string, req: IncomingMessage, res: ServerResponse): Promise<void> => {
+		const responseHeaders = Object.create(null);
+
 		try {
 			// Sanity checks
 			filePath = normalize(filePath); // ensure no "." and ".."
@@ -298,8 +305,37 @@ export class WebRequestHandler extends AbstractNetRequestHandler<WebRequestListe
 		res.end(errorMessage);
 	};
 
+
 	public override dispose() {
 		super.dispose();
+
+		this.callbackUriToRequestId.forEach(({ timeout }) => clearTimeout(timeout));
 		this.callbackUriToRequestId.clear();
 	}
+
+	/**
+	 * Publically available routes.
+	 * @remark The order of entry defines a route's priority.
+	 */
+	private readonly routes: Map<MatchFunction, WebRequestListener<any>>;
+
+	constructor(netServer: Server, environmentService: IEnvironmentServerService, logService: ILogService) {
+		super(netServer, environmentService, logService);
+
+		const routePairs: readonly RoutePair[] = [
+			['/manifest.json', this.$manifest],
+			['/favicon.ico', this.serveFile.bind(this, paths.FAVICON)],
+			['/static/(.*)', this.$static],
+			['/webview/(.*)', this.$webview],
+			['/', this.$root],
+			['/callback', this.$callback],
+			['/fetch-callback', this.$fetchCallback],
+			['/vscode-remote-resource', this.$remoteResource],
+		];
+
+		this.routes = new Map(routePairs.map(([pattern, handler]) => [match(pattern, matcherOptions), handler]));
+
+	}
 }
+
+type RoutePair = readonly [string, WebRequestListener<any>];

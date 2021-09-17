@@ -78,9 +78,7 @@ export class EnvironmentServerService extends NativeEnvironmentService implement
 			// Endpoints
 			logoutEndpointUrl: logoutEndpointUrl.toString(),
 			webEndpointUrl: this.createRequestUrl(req, '/static').toString(),
-			// TODO: the webview endpoint seems to have some unusual routing properties
-			// Omitting this fallback to `BrowserWorkbenchEnvironmentService#webviewExternalEndpoint`
-			// webviewContentExternalBaseUrlTemplate: this.createRequestUrl(req, '/webview').toString(),
+			webviewContentExternalBaseUrlTemplate: this.createRequestUrl(req, '/webview').toString(),
 
 			icons: [
 				{

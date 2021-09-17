@@ -12,12 +12,12 @@ import { Schemas } from 'vs/base/common/network';
 import { isEqual } from 'vs/base/common/resources';
 import { URI, UriComponents } from 'vs/base/common/uri';
 import { generateUuid } from 'vs/base/common/uuid';
-import { IWorkbenchConfigurationSerialized } from 'vs/platform/workspaces/common/workbench';
+import { IWebWorkspace } from 'vs/platform/workspaces/common/workbench';
 import { request } from 'vs/base/parts/request/browser/request';
 import { localize } from 'vs/nls';
 import product from 'vs/platform/product/common/product';
 import { isFolderToOpen, isWorkspaceToOpen } from 'vs/platform/windows/common/windows';
-import { create, ICredentialsProvider, IProductQualityChangeHandler, ISettingsSyncOptions, IURLCallbackProvider, IWindowIndicator, IWorkspace, IWorkspaceProvider } from 'vs/workbench/workbench.web.api';
+import { create, ICredentialsProvider, IProductQualityChangeHandler, ISettingsSyncOptions, IURLCallbackProvider, IWindowIndicator, IWorkbenchConstructionOptions, IWorkspace, IWorkspaceProvider } from 'vs/workbench/workbench.web.api';
 
 function doCreateUri(path: string, queryValues: Map<string, string>): URI {
 	let query: string | undefined = undefined;
@@ -425,22 +425,7 @@ class WindowIndicator implements IWindowIndicator {
 		throw new Error('Missing web configuration element');
 	}
 
-	const config: IWorkbenchConfigurationSerialized = {
-		webviewEndpoint: `${window.location.origin}${window.location.pathname.replace(/\/+$/, '')}/webview`,
-		...JSON.parse(configElementAttribute),
-	};
-
-	// Strip the protocol from the authority if it exists.
-	const normalizeAuthority = (authority: string): string => authority.replace(/^https?:\/\//, '');
-	if (config.remoteAuthority) {
-		(config as any).remoteAuthority = normalizeAuthority(config.remoteAuthority);
-	}
-	if (config.workspaceUri && config.workspaceUri.authority) {
-		config.workspaceUri.authority = normalizeAuthority(config.workspaceUri.authority);
-	}
-	if (config.folderUri && config.folderUri.authority) {
-		config.folderUri.authority = normalizeAuthority(config.folderUri.authority);
-	}
+	const config: IWorkbenchConstructionOptions & IWebWorkspace = JSON.parse(configElementAttribute);
 
 	// Find workspace to open and payload
 	let foundWorkspace = false;

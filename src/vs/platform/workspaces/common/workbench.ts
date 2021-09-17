@@ -78,7 +78,7 @@ export interface IWorkbenchConfigurationSerialized extends IWebWorkspaceProvider
 
 	/**
 	 * A handler for opening workspaces and providing the initial workspace.
-		 */
+	 */
 	readonly workspaceProvider: IWebWorkspaceProvider;
 
 	/**
