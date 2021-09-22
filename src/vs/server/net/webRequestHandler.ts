@@ -13,6 +13,7 @@ import { ProtocolConstants } from '../../base/parts/ipc/common/ipc.net';
 import { AbstractNetRequestHandler, escapeJSON, ParsedRequest } from './abstractNetRequestHandler';
 import { IEnvironmentServerService } from 'vs/server/services/environmentService';
 import { ILogService } from 'vs/platform/log/common/log';
+import { randomBytes } from 'crypto';
 
 const APP_ROOT = join(__dirname, '..', '..', '..', '..');
 
@@ -21,18 +22,22 @@ const paths = {
 	FAVICON: join(APP_ROOT, 'resources', 'win32', 'code.ico'),
 };
 
+
 /** Matching the given keys in `PollingURLCallbackProvider.QUERY_KEYS` */
-type PollingURLQueryKeys = 'vscode-requestId' | 'vscode-scheme' | 'vscode-authority' | 'vscode-path' | 'vscode-query' | 'vscode-fragment';
-const wellKnownKeys: PollingURLQueryKeys[] = [
-	// TODO: Can this type be inferred without importing a browser specific file?
+const wellKnownKeys = [
 	'vscode-requestId',
 	'vscode-scheme',
 	'vscode-authority',
 	'vscode-path',
 	'vscode-query',
 	'vscode-fragment',
-];
+] as const;
 
+type PollingURLQueryKeys = typeof wellKnownKeys[number];
+
+/**
+ * See [Web app manifest on MDN](https://developer.mozilla.org/en-US/docs/Web/Manifest) for additional information.
+ */
 export interface WebManifest {
 	name: string;
 	short_name: string;
@@ -52,11 +57,60 @@ interface Callback {
 	timeout: NodeJS.Timeout;
 }
 
+/**
+ * A function which may respond to a request with an possible set of URL params.
+ */
 export type WebRequestListener<T extends object | null = null> = T extends object
 	? (req: ParsedRequest, res: ServerResponse, params: MatchResult<T>['params']) => void | Promise<void>
 	: (req: ParsedRequest, res: ServerResponse) => void | Promise<void>;
 
 const matcherOptions = { encode: encodeURI, decode: decodeURIComponent };
+
+/**
+ * A nonce used to mark specific inline scripts as secure.
+ * @example To use, apply the following attribute:
+ * ```html
+ * <script nonce="{{CSP_NONCE}}">...</script>
+ * ```
+ */
+const CSP_NONCE = randomBytes(16).toString('base64');
+
+/**
+ * Content security policies derived from existing inline Workbench CSPs.
+ */
+const contentSecurityPolicies: Record<string, string> = {
+	'default-src': `'nonce-${CSP_NONCE}'`,
+	'manifest-src': `'self'`,
+	'img-src': `'self' https: data: blob: vscode-remote-resource:`,
+	'media-src': `'none'`,
+	'frame-src': `'self' vscode-webview:`,
+	'object-src': `'self'`,
+	'script-src': `'self' 'nonce-${CSP_NONCE}' 'unsafe-eval' blob:`,
+	'style-src': `'self' 'unsafe-inline'`,
+	'connect-src': `'self' https: ws:`,
+	'font-src': `'self' https: vscode-remote-resource:`,
+
+	'require-trusted-types-for': `'script'`,
+	'trusted-types': [
+		'TrustedFunctionWorkaround',
+		'ExtensionScripts',
+		'amdLoader',
+		'cellRendererEditorText',
+		'defaultWorkerFactory',
+		'diffEditorWidget',
+		'editorGhostText',
+		'domLineBreaksComputer',
+		'editorViewLayer',
+		'diffReview',
+		'extensionHostWorker',
+		'insane',
+		'notebookRenderer',
+		'safeInnerHtml',
+		'standaloneColorizer',
+		'tokenizeToString',
+		'webNestedWorkerExtensionHost'
+	].join(' ')
+};
 
 export class WebRequestHandler extends AbstractNetRequestHandler<WebRequestListener> {
 	/** Stored callback URI's sent over from client-side `PollingURLCallbackProvider`. */
@@ -67,6 +121,11 @@ export class WebRequestHandler extends AbstractNetRequestHandler<WebRequestListe
 		workbenchProd: readFileSync(join(APP_ROOT, 'src', 'vs', 'code', 'browser', 'workbench', 'workbench.html')).toString(),
 		callback: readFileSync(join(APP_ROOT, 'resources', 'web', 'callback.html')).toString(),
 	};
+
+	private contentSecurityPolicyHeaderContent = Object
+		.keys(contentSecurityPolicies)
+		.map((policyName) => `${policyName} ${contentSecurityPolicies[policyName]};`)
+		.join(' ');
 
 	protected eventName = 'request';
 	/**
@@ -109,7 +168,7 @@ export class WebRequestHandler extends AbstractNetRequestHandler<WebRequestListe
 	/**
 	 * PWA manifest file. This informs the browser that the app may be installed.
 	 */
-	private $manifest: WebRequestListener = async (req, res) => {
+	private $webManifest: WebRequestListener = async (req, res) => {
 		const { productConfiguration } = await this.environmentService.createWorkbenchWebConfiguration(req);
 
 		const webManifest: WebManifest = {
@@ -141,23 +200,24 @@ export class WebRequestHandler extends AbstractNetRequestHandler<WebRequestListe
 	 */
 	private $root: WebRequestListener = async (req, res) => {
 		const webConfigJSON = await this.environmentService.createWorkbenchWebConfiguration(req);
+		const { isBuilt } = this.environmentService;
+
 		// TODO: investigate auth session for authentication.
 		// const authSessionInfo = null;
 
-		const content = this.templates[this.environmentService.isBuilt ? 'workbenchProd' : 'workbenchDev']
+		const content = this.templates[isBuilt ? 'workbenchProd' : 'workbenchDev']
 			// Inject server-side workbench configuration for client-side workbench.
 			.replace('{{WORKBENCH_WEB_CONFIGURATION}}', () => escapeJSON(webConfigJSON))
-			.replace('{{PATH_PREFIX}}', () => req.pathPrefix)
-			.replace('{{WORKBENCH_BUILTIN_EXTENSIONS}}', () => escapeJSON([]));
+			.replace('{{WORKBENCH_BUILTIN_EXTENSIONS}}', () => escapeJSON([]))
+			.replace(/{{PATH_PREFIX}}/g, req.pathPrefix)
+			.replace(/{{CSP_NONCE}}/g, CSP_NONCE);
 		// .replace('{{WORKBENCH_AUTH_SESSION}}', () => (authSessionInfo ? escapeJSON(authSessionInfo) : ''));
 
-		const headers = {
+		res.writeHead(200, {
 			'Content-Type': 'text/html',
-			// TODO: investigate why this breaks the the extensions tab.
-			'Content-Security-Policy': `require-trusted-types-for 'script';`,
-		};
+			[isBuilt ? 'Content-Security-Policy' : 'Content-Security-Policy-Report-Only']: this.contentSecurityPolicyHeaderContent
+		});
 
-		res.writeHead(200, headers);
 		return res.end(content);
 	};
 
@@ -323,7 +383,9 @@ export class WebRequestHandler extends AbstractNetRequestHandler<WebRequestListe
 		super(netServer, environmentService, logService);
 
 		const routePairs: readonly RoutePair[] = [
-			['/manifest.json', this.$manifest],
+			['/manifest.webmanifest', this.$webManifest],
+			// Legacy browsers.
+			['/manifest.json', this.$webManifest],
 			['/favicon.ico', this.serveFile.bind(this, paths.FAVICON)],
 			['/static/(.*)', this.$static],
 			['/webview/(.*)', this.$webview],

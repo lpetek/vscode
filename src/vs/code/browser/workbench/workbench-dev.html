@@ -2,7 +2,7 @@
 <!DOCTYPE html>
 <html>
 	<head>
-		<script>
+		<script nonce="{{CSP_NONCE}}">
 			performance.mark('code/didStartRenderer')
 		</script>
 		<meta charset="utf-8" />
@@ -30,12 +30,13 @@
 	<!-- Startup (do not modify order of script tags!) -->
 	<script src="./static/out/vs/loader.js"></script>
 	<script src="./static/out/vs/webPackagePaths.js"></script>
-	<script>
+	<script nonce="{{CSP_NONCE}}">
 		Object.keys(self.webPackagePaths).map(function (key, index) {
 			self.webPackagePaths[key] = `${window.location.origin}/static/remote/web/node_modules/${key}/${self.webPackagePaths[key]}`;
 		});
 		require.config({
 			baseUrl: `${window.location.origin}/static/out`,
+			cspNonce: '{{CSP_NONCE}}',
 			recordStats: true,
 			trustedTypesPolicy: window.trustedTypes?.createPolicy('amdLoader', {
 				createScriptURL(value) {
@@ -49,10 +50,10 @@
 		});
 	</script>
 
-	<script>
+	<script nonce="{{CSP_NONCE}}">
 		performance.mark('code/willLoadWorkbenchMain');
 	</script>
-	<script>
+	<script nonce="{{CSP_NONCE}}">
 		require(['vs/code/browser/workbench/workbench'], function() {});
 	</script>
 </html>

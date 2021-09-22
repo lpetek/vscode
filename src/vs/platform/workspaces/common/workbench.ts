@@ -77,6 +77,12 @@ export interface IWorkbenchConfigurationSerialized extends IWebWorkspaceProvider
 	readonly productConfiguration: Partial<IProductConfiguration> & Pick<IProductConfiguration, 'logoutEndpointUrl'>;
 
 	/**
+	 * An endpoint to serve iframe content ("webview") from. This is required
+	 * to provide full security isolation from the workbench host.
+	 */
+	readonly webviewEndpoint: string;
+
+	/**
 	 * A handler for opening workspaces and providing the initial workspace.
 	 */
 	readonly workspaceProvider: IWebWorkspaceProvider;

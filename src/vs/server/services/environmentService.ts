@@ -38,7 +38,12 @@ export interface IEnvironmentServerServiceConfiguration {
  * @remark This can be used to cache portions of the config which do not change
  * between client-side requests.
  */
-type IStaticWorkbenchWebConfiguration = Omit<IWorkbenchConfigurationSerialized, 'productConfiguration' | 'workspace' | 'remoteUserDataUri' | 'remoteAuthority'>;
+type IStaticWorkbenchWebConfiguration = Omit<IWorkbenchConfigurationSerialized,
+	| 'webviewEndpoint'
+	| 'productConfiguration'
+	| 'workspace'
+	| 'remoteUserDataUri'
+	| 'remoteAuthority'>;
 
 /**
  * The `EnvironmentServerService` is fairly similar to the Electron specific
@@ -78,7 +83,6 @@ export class EnvironmentServerService extends NativeEnvironmentService implement
 			// Endpoints
 			logoutEndpointUrl: logoutEndpointUrl.toString(),
 			webEndpointUrl: this.createRequestUrl(req, '/static').toString(),
-			webviewContentExternalBaseUrlTemplate: this.createRequestUrl(req, '/webview').toString(),
 
 			icons: [
 				{
@@ -104,6 +108,7 @@ export class EnvironmentServerService extends NativeEnvironmentService implement
 			...staticWorkbenchWebConfig,
 			...workspace,
 			remoteAuthority,
+			webviewEndpoint: this.createRequestUrl(req, '/webview').toString(),
 			productConfiguration,
 			workspaceProvider: {
 				...staticWorkbenchWebConfig.workspaceProvider,
