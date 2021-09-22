@@ -1,7 +1,6 @@
 import { SendHandle } from 'child_process';
 import { VSBuffer } from 'vs/base/common/buffer';
 import { FileAccess } from 'vs/base/common/network';
-import { NLSConfiguration } from 'vs/base/node/languagePacks';
 import { findFreePort } from 'vs/base/node/ports';
 import { IIPCOptions } from 'vs/base/parts/ipc/node/ipc.cp';
 import { ILogService } from 'vs/platform/log/common/log';
@@ -13,15 +12,19 @@ import { ServerProtocol } from 'vs/server/protocol';
 import { parseExtensionDevOptions } from 'vs/workbench/services/extensions/common/extensionDevOptions';
 import { ExtensionHost } from 'vs/workbench/services/extensions/node/extensionHost';
 
+/**
+ * @remark Ensure this remains JSON serializable.
+ */
 export interface ForkEnvironmentVariables {
+	/** Specify one or the other. */
 	VSCODE_AMD_ENTRYPOINT: string;
-	/** One or the other. */
 	VSCODE_EXTHOST_WILL_SEND_SOCKET: true;
+
 	VSCODE_HANDLES_UNCAUGHT_ERRORS: boolean;
 	VSCODE_LOG_LEVEL?: string;
 	VSCODE_LOG_NATIVE: boolean;
 	VSCODE_LOG_STACK: boolean;
-	VSCODE_NLS_CONFIG: NLSConfiguration;
+	VSCODE_NLS_CONFIG: string;
 	VSCODE_PIPE_LOGGING: boolean;
 	VSCODE_VERBOSE_LOGGING: boolean;
 	VSCODE_CODE_CACHE_PATH?: string;
@@ -130,7 +133,7 @@ export class ExtensionHostConnection extends AbstractConnection {
 
 	private async generateClientOptions(): Promise<IIPCOptions> {
 		this.logService.debug('Getting NLS configuration...');
-		const config = await getCachedNlsConfiguration(this.startParams.language, this._environmentService.userDataPath);
+		const nlsConfiguration = await getCachedNlsConfiguration(this.startParams.language, this._environmentService.userDataPath);
 		const portNumber = await this._tryFindDebugPort();
 
 		return {
@@ -148,7 +151,7 @@ export class ExtensionHostConnection extends AbstractConnection {
 				VSCODE_HANDLES_UNCAUGHT_ERRORS: true,
 				VSCODE_LOG_STACK: false,
 				VSCODE_LOG_LEVEL: this._environmentService.verbose ? 'trace' : this._environmentService.logLevel || process.env.LOG_LEVEL,
-				VSCODE_NLS_CONFIG: config,
+				VSCODE_NLS_CONFIG: JSON.stringify(nlsConfiguration),
 				VSCODE_LOG_NATIVE: this._isExtensionDevHost,
 				// Unset `VSCODE_CODE_CACHE_PATH` when developing extensions because it might
 				// be that dependencies, that otherwise would be cached, get modified.
