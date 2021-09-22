@@ -16,7 +16,6 @@ import { isAbsolute, join } from 'vs/base/common/path';
 import { cwd } from 'vs/base/common/process';
 import { URI } from 'vs/base/common/uri';
 import { Promises } from 'vs/base/node/pfs';
-import { monkeyPatchProxyProtocols } from 'vs/base/node/proxyAgent';
 import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
 import { ConfigurationService } from 'vs/platform/configuration/common/configurationService';
 import { NativeParsedArgs } from 'vs/platform/environment/common/argv';
@@ -47,7 +46,6 @@ import { ITelemetryServiceConfig, TelemetryService } from 'vs/platform/telemetry
 import { combinedAppender, NullTelemetryService } from 'vs/platform/telemetry/common/telemetryUtils';
 import { AppInsightsAppender } from 'vs/platform/telemetry/node/appInsightsAppender';
 import { buildTelemetryMessage } from 'vs/platform/telemetry/node/telemetry';
-import { enableCustomMarketplace } from 'vs/base/node/marketplace';
 
 class CliMain extends Disposable {
 
@@ -240,10 +238,6 @@ class CliMain extends Disposable {
 }
 
 export async function main(argv: NativeParsedArgs): Promise<void> {
-	/** @coder */
-	enableCustomMarketplace(product);
-	monkeyPatchProxyProtocols();
-
 	const cliMain = new CliMain(argv);
 
 	try {
