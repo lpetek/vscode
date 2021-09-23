@@ -8,12 +8,15 @@ import { Server, IncomingMessage, ServerResponse } from 'http';
 import { match, MatchFunction, MatchResult } from 'path-to-regexp';
 import { join, normalize } from 'path';
 import { UriComponents } from 'vs/base/common/uri';
-import { getMediaOrTextMime, PLAIN_TEXT_MIME_TYPE } from '../../base/common/mime';
-import { ProtocolConstants } from '../../base/parts/ipc/common/ipc.net';
-import { AbstractNetRequestHandler, escapeJSON, ParsedRequest } from './abstractNetRequestHandler';
+import { getMediaOrTextMime, PLAIN_TEXT_MIME_TYPE } from 'vs/base/common/mime';
+import { ProtocolConstants } from 'vs/base/parts/ipc/common/ipc.net';
+import { AbstractNetRequestHandler, escapeJSON, IAbstractNetRequestHandler, ParsedRequest } from 'vs/server/net/abstractNetRequestHandler';
 import { IEnvironmentServerService } from 'vs/server/services/environmentService';
 import { ILogService } from 'vs/platform/log/common/log';
 import { randomBytes } from 'crypto';
+import { editorBackground } from 'vs/platform/theme/common/colorRegistry';
+import { IServerThemeService } from 'vs/server/services/serverThemeService';
+import { refineServiceDecorator } from 'vs/platform/instantiation/common/instantiation';
 
 const APP_ROOT = join(__dirname, '..', '..', '..', '..');
 
@@ -112,7 +115,13 @@ const contentSecurityPolicies: Record<string, string> = {
 	].join(' ')
 };
 
-export class WebRequestHandler extends AbstractNetRequestHandler<WebRequestListener> {
+export interface IWebRequestHandler extends IAbstractNetRequestHandler {
+	listen(): void;
+}
+
+export const IWebRequestHandler = refineServiceDecorator<IAbstractNetRequestHandler, IWebRequestHandler>(IAbstractNetRequestHandler);
+
+export class WebRequestHandler extends AbstractNetRequestHandler<WebRequestListener> implements IWebRequestHandler {
 	/** Stored callback URI's sent over from client-side `PollingURLCallbackProvider`. */
 	private callbackUriToRequestId = new Map<string, Callback>();
 
@@ -170,13 +179,14 @@ export class WebRequestHandler extends AbstractNetRequestHandler<WebRequestListe
 	 */
 	private $webManifest: WebRequestListener = async (req, res) => {
 		const { productConfiguration } = await this.environmentService.createWorkbenchWebConfiguration(req);
+		const clientBackgroundColor = await this.fetchClientBackgroundColor();
 
 		const webManifest: WebManifest = {
 			name: productConfiguration.nameLong!,
 			short_name: productConfiguration.nameShort!,
 			start_url: req.pathPrefix,
 			display: 'fullscreen',
-			'background-color': '#fff',
+			'background-color': clientBackgroundColor,
 			description: 'Run editors on a remote server.',
 			// icons: productConfiguration.icons || [],
 			icons: [],
@@ -201,14 +211,16 @@ export class WebRequestHandler extends AbstractNetRequestHandler<WebRequestListe
 	private $root: WebRequestListener = async (req, res) => {
 		const webConfigJSON = await this.environmentService.createWorkbenchWebConfiguration(req);
 		const { isBuilt } = this.environmentService;
+		const clientBackgroundColor = await this.fetchClientBackgroundColor();
 
 		// TODO: investigate auth session for authentication.
 		// const authSessionInfo = null;
-
 		const content = this.templates[isBuilt ? 'workbenchProd' : 'workbenchDev']
 			// Inject server-side workbench configuration for client-side workbench.
 			.replace('{{WORKBENCH_WEB_CONFIGURATION}}', () => escapeJSON(webConfigJSON))
 			.replace('{{WORKBENCH_BUILTIN_EXTENSIONS}}', () => escapeJSON([]))
+			.replace(/{{CLIENT_BACKGROUND_COLOR}}/g, () => clientBackgroundColor)
+
 			.replace(/{{PATH_PREFIX}}/g, req.pathPrefix)
 			.replace(/{{CSP_NONCE}}/g, CSP_NONCE);
 		// .replace('{{WORKBENCH_AUTH_SESSION}}', () => (authSessionInfo ? escapeJSON(authSessionInfo) : ''));
@@ -309,20 +321,6 @@ export class WebRequestHandler extends AbstractNetRequestHandler<WebRequestListe
 		return this.serveFile(join(paths.WEBVIEW, params[0]), req, res);
 	};
 
-	/**
-	 * Webview Resource endpoint
-	 */
-	//  private $webviewResource: WebRequestListener = async (req, res) => {
-	// 	const foo = req.parsedUrl.pathname.foo;
-
-	// 	if (/^/.test(foo)) {
-	// 		return this.serveFile(req, res, foo.replace(/^vscode-resource(\/file)?/, ''));
-	// 	}
-
-	// 	return this.serveFile(req, res, join(paths.WEBVIEW, foo));
-	// };
-
-
 	serveFile = async (filePath: string, req: IncomingMessage, res: ServerResponse): Promise<void> => {
 		const responseHeaders = Object.create(null);
 
@@ -373,14 +371,29 @@ export class WebRequestHandler extends AbstractNetRequestHandler<WebRequestListe
 		this.callbackUriToRequestId.clear();
 	}
 
+	private async fetchClientBackgroundColor(): Promise<string> {
+		const theme = await this.themeService.fetchColorThemeData();
+
+		const backgroundColor = theme.getColor(editorBackground, true);
+
+		return backgroundColor!.toString();
+	}
+
 	/**
 	 * Publically available routes.
 	 * @remark The order of entry defines a route's priority.
 	 */
 	private readonly routes: Map<MatchFunction, WebRequestListener<any>>;
+	private themeService: IServerThemeService;
 
-	constructor(netServer: Server, environmentService: IEnvironmentServerService, logService: ILogService) {
+	constructor(
+		netServer: Server,
+		themeService: IServerThemeService,
+		@IEnvironmentServerService environmentService: IEnvironmentServerService,
+		@ILogService logService: ILogService,
+	) {
 		super(netServer, environmentService, logService);
+		this.themeService = themeService;
 
 		const routePairs: readonly RoutePair[] = [
 			['/manifest.webmanifest', this.$webManifest],

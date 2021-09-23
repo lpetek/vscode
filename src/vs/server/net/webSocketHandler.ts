@@ -16,16 +16,25 @@ import { ExtensionHostConnection } from 'vs/server/net/connection/extensionHostC
 import { ManagementConnection } from 'vs/server/net/connection/managementConnection';
 import { ServerProtocol } from 'vs/server/protocol';
 import { VSBuffer } from 'vs/base/common/buffer';
-import { AbstractNetRequestHandler, ParsedRequest } from './abstractNetRequestHandler';
+import { AbstractNetRequestHandler, IAbstractNetRequestHandler, ParsedRequest } from 'vs/server/net/abstractNetRequestHandler';
+import { refineServiceDecorator } from 'vs/platform/instantiation/common/instantiation';
+import { IEnvironmentServerService } from 'vs/server/services/environmentService';
+import { ILogService } from 'vs/platform/log/common/log';
 
 type Connection = ExtensionHostConnection | ManagementConnection;
 
 export type UpgradeListener = (req: ParsedRequest, socket: net.Socket, head: Buffer) => void;
 
+export interface IWebSocketHandler extends IAbstractNetRequestHandler {
+	listen(): void;
+}
+
+export const IWebSocketHandler = refineServiceDecorator<IAbstractNetRequestHandler, IWebSocketHandler>(IAbstractNetRequestHandler);
+
 /**
  * Handles client connections to a editor instance via IPC.
  */
-export class WebSocketHandler extends AbstractNetRequestHandler<UpgradeListener> {
+export class WebSocketHandler extends AbstractNetRequestHandler<UpgradeListener> implements IWebSocketHandler {
 	protected eventName = 'upgrade';
 	private readonly _onDidClientConnect = new Emitter<ClientConnectionEvent>();
 	public readonly onDidClientConnect = this._onDidClientConnect.event;
@@ -165,6 +174,14 @@ export class WebSocketHandler extends AbstractNetRequestHandler<UpgradeListener>
 		for (let i = 0, max = offline.length - this.maxExtraOfflineConnections; i < max; ++i) {
 			offline[i].dispose('old');
 		}
+	}
+
+	constructor(
+		netServer: net.Server,
+		@IEnvironmentServerService environmentService: IEnvironmentServerService,
+		@ILogService logService: ILogService,
+	) {
+		super(netServer, environmentService, logService);
 	}
 }
 

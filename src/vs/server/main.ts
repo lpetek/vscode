@@ -10,7 +10,6 @@ import { hostname, release } from 'os';
 import * as path from 'path';
 import { combinedDisposable, Disposable } from 'vs/base/common/lifecycle';
 import { Schemas } from 'vs/base/common/network';
-import { createServerURITransformer } from 'vs/server/uriTransformer';
 import { IPCServer, IServerChannel, ProxyChannel } from 'vs/base/parts/ipc/common/ipc';
 import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
 import { ConfigurationService } from 'vs/platform/configuration/common/configurationService';
@@ -44,9 +43,20 @@ import { ITelemetryServiceConfig, TelemetryService } from 'vs/platform/telemetry
 import { combinedAppender, NullTelemetryService } from 'vs/platform/telemetry/common/telemetryUtils';
 import { AppInsightsAppender } from 'vs/platform/telemetry/node/appInsightsAppender';
 import ErrorTelemetry from 'vs/platform/telemetry/node/errorTelemetry';
+import { IReconnectConstants, LocalReconnectConstants, TerminalSettingId } from 'vs/platform/terminal/common/terminal';
 import { PtyHostService } from 'vs/platform/terminal/node/ptyHostService';
 import { TelemetryClient } from 'vs/server/insights';
+import { ExtensionEnvironmentChannel } from 'vs/server/ipc/extensionEnvironmentIpc';
+import { FileProviderChannel } from 'vs/server/ipc/fileProviderIpc';
+import { TerminalProviderChannel } from 'vs/server/ipc/terminalProviderIpc';
+import { LogsDataCleaner } from 'vs/server/logsDataCleaner';
+import { INLSExtensionScannerService, NLSExtensionScannerService } from 'vs/server/services/nlsExtensionScannerService';
+import { IServerThemeService, ServerThemeService } from 'vs/server/services/serverThemeService';
+import { createServerURITransformer } from 'vs/server/uriTransformer';
 import { REMOTE_TERMINAL_CHANNEL_NAME } from 'vs/workbench/contrib/terminal/common/remoteTerminalChannel';
+import { IExtensionResourceLoaderService } from 'vs/workbench/services/extensionResourceLoader/common/extensionResourceLoader';
+// eslint-disable-next-line code-import-patterns
+import { ExtensionResourceLoaderService } from 'vs/workbench/services/extensionResourceLoader/electron-sandbox/extensionResourceLoaderService';
 import { REMOTE_FILE_SYSTEM_CHANNEL_NAME } from 'vs/workbench/services/remote/common/remoteAgentFileSystemChannel';
 import { RemoteExtensionLogFileName } from 'vs/workbench/services/remote/common/remoteAgentService';
 import { toErrorMessage } from '../base/common/errorMessage';
@@ -54,14 +64,9 @@ import { setUnexpectedErrorHandler } from '../base/common/errors';
 import { getMachineId } from '../base/node/id';
 import { IInstantiationService } from '../platform/instantiation/common/instantiation';
 import { RemoteAgentConnectionContext } from '../platform/remote/common/remoteAgentEnvironment';
+import { WebRequestHandler } from './net/webRequestHandler';
 import { WebSocketHandler } from './net/webSocketHandler';
 import { EnvironmentServerService, IEnvironmentServerService } from './services/environmentService';
-import { WebRequestHandler } from './net/webRequestHandler';
-import { FileProviderChannel } from 'vs/server/ipc/fileProviderIpc';
-import { ExtensionEnvironmentChannel } from 'vs/server/ipc/extensionEnvironmentIpc';
-import { TerminalProviderChannel } from 'vs/server/ipc/terminalProviderIpc';
-import { IReconnectConstants, LocalReconnectConstants, TerminalSettingId } from 'vs/platform/terminal/common/terminal';
-import { LogsDataCleaner } from 'vs/server/logsDataCleaner';
 
 interface IServerProcessMainStartupOptions {
 	listenWhenReady?: boolean;
@@ -90,14 +95,21 @@ export class ServerProcessMain extends Disposable implements IServerProcessMain 
 
 	public async startup({ listenWhenReady = true }: IServerProcessMainStartupOptions = {}): Promise<NetServer> {
 		// Services
-		const [instantiationService, environmentServerService, logService, bufferLogService] = await this.createServices();
+		const [
+			instantiationService,
+			environmentServerService,
+			logService,
+			serverThemeService,
+			bufferLogService,
+		] = await this.createServices();
 
 		// Net Server
 		const netServer = createNetServer();
 
-		const webSocketHandler = new WebSocketHandler(netServer, environmentServerService, logService);
+		const webSocketHandler = instantiationService.createInstance(WebSocketHandler, netServer);
 		webSocketHandler.listen();
-		const webRequestHandler = new WebRequestHandler(netServer, environmentServerService, logService);
+
+		const webRequestHandler = instantiationService.createInstance(WebRequestHandler, netServer, serverThemeService);
 		webRequestHandler.listen();
 
 		// IPC Server
@@ -132,7 +144,7 @@ export class ServerProcessMain extends Disposable implements IServerProcessMain 
 	// References:
 	// ../../electron-browser/sharedProcess/sharedProcessMain.ts#L148
 	// ../../../code/electron-main/app.ts
-	public async createServices(): Promise<[IInstantiationService, IEnvironmentServerService, ILogService, BufferLogService]> {
+	public async createServices(): Promise<[IInstantiationService, IEnvironmentServerService, ILogService, IServerThemeService, BufferLogService]> {
 		const services = new ServiceCollection();
 
 		// Product
@@ -175,22 +187,28 @@ export class ServerProcessMain extends Disposable implements IServerProcessMain 
 		services.set(ILogService, logService);
 		services.set(ILoggerService, loggerService);
 
+		// Configuration
 		const configurationService = new ConfigurationService(environmentServerService.settingsResource, fileService);
 		await configurationService.initialize();
 		services.set(IConfigurationService, configurationService);
 
+		// Request
 		services.set(IRequestService, new SyncDescriptor(RequestService));
+
+		// File Service can now be set...
 		services.set(IFileService, fileService);
 
+		// Configuration
 		await configurationService.initialize();
 		services.set(IConfigurationService, configurationService);
 
-		const machineId = await this.resolveMachineId();
-
+		// Instantiation
 		const instantiationService = new InstantiationService(services);
 
 		// Telemetry
 		if (!environmentServerService.isExtensionDevelopment && !environmentServerService.disableTelemetry && productService.enableTelemetry) {
+			const machineId = await this.resolveMachineId();
+
 			const appender = combinedAppender(new AppInsightsAppender('code-server', null, () => new TelemetryClient()), new TelemetryLogAppender(loggerService, environmentServerService));
 
 			const commonProperties = resolveCommonProperties(fileService, release(), hostname(), process.arch, environmentServerService.commit, product.version, machineId, undefined, environmentServerService.installSourcePath, 'code-server');
@@ -202,21 +220,42 @@ export class ServerProcessMain extends Disposable implements IServerProcessMain 
 			services.set(ITelemetryService, NullTelemetryService);
 		}
 
+		// Extensions
 		services.set(IExtensionManagementService, new SyncDescriptor(ExtensionManagementService));
 		services.set(IExtensionGalleryService, new SyncDescriptor(ExtensionGalleryService));
+
+		const extensionResourceLoaderService = new ExtensionResourceLoaderService(fileService);
+		services.set(IExtensionResourceLoaderService, extensionResourceLoaderService);
+
+		const extensionScannerService = new NLSExtensionScannerService(environmentServerService, logService, productService);
+		services.set(INLSExtensionScannerService, extensionScannerService);
+
+		// Themes
+		const serverThemeService = new ServerThemeService(extensionScannerService, logService, configurationService, extensionResourceLoaderService);
+		await serverThemeService.initialize();
+		services.set(IServerThemeService, serverThemeService);
+
+		// Localization
 		services.set(ILocalizationsService, new SyncDescriptor(LocalizationsService));
 
-		return [instantiationService, environmentServerService, logService, bufferLogService];
+		return [
+			instantiationService,
+			environmentServerService,
+			logService,
+			serverThemeService,
+			bufferLogService,
+		];
 	}
 
 	private initChannels(instantiationService: IInstantiationService, ipcServer: IPCServer<RemoteAgentConnectionContext>): Promise<void> {
 		return new Promise(resolve => {
-			instantiationService.invokeFunction(accessor => {
+			instantiationService.invokeFunction(async accessor => {
 				const configurationService = accessor.get(IConfigurationService);
 				const logService = accessor.get(ILogService);
 				const telemetryService = accessor.get(ITelemetryService);
 				const extensionManagementService = accessor.get(IExtensionManagementService);
 				const environmentServerService = accessor.get(IEnvironmentServerService);
+				const nlsExtensionScannerService = accessor.get(INLSExtensionScannerService);
 				const localizationsService = accessor.get(ILocalizationsService);
 				const requestService = accessor.get(IRequestService);
 
@@ -224,7 +263,8 @@ export class ServerProcessMain extends Disposable implements IServerProcessMain 
 				ipcServer.registerChannel(ExtensionHostDebugBroadcastChannel.ChannelName, new ExtensionHostDebugBroadcastChannel());
 
 				ipcServer.registerChannel('extensions', new ExtensionManagementChannel(extensionManagementService, context => createServerURITransformer(context.remoteAuthority)));
-				ipcServer.registerChannel('remoteextensionsenvironment', new ExtensionEnvironmentChannel(environmentServerService, logService, telemetryService, ''));
+
+				ipcServer.registerChannel('remoteextensionsenvironment', new ExtensionEnvironmentChannel(environmentServerService, nlsExtensionScannerService, telemetryService, ''));
 				ipcServer.registerChannel('request', new RequestChannel(requestService));
 				ipcServer.registerChannel('localizations', <IServerChannel<any>>ProxyChannel.fromService(localizationsService));
 				ipcServer.registerChannel(REMOTE_FILE_SYSTEM_CHANNEL_NAME, new FileProviderChannel(environmentServerService, logService));
