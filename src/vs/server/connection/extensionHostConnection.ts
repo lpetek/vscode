@@ -5,12 +5,12 @@ import { findFreePort } from 'vs/base/node/ports';
 import { IIPCOptions } from 'vs/base/parts/ipc/node/ipc.cp';
 import { ILogService } from 'vs/platform/log/common/log';
 import { DebugMessage, IRemoteExtensionHostStartParams } from 'vs/platform/remote/common/remoteAgentConnection';
-import { IEnvironmentServerService } from 'vs/server/services/environmentService';
-import { AbstractConnection } from 'vs/server/net/connection/abstractConnection';
-import { getCachedNlsConfiguration } from 'vs/workbench/services/extensions/node/nls';
+import { AbstractConnection } from 'vs/server/connection/abstractConnection';
 import { ServerProtocol } from 'vs/server/protocol';
+import { IEnvironmentServerService } from 'vs/server/services/environmentService';
 import { parseExtensionDevOptions } from 'vs/workbench/services/extensions/common/extensionDevOptions';
 import { ExtensionHost } from 'vs/workbench/services/extensions/node/extensionHost';
+import { getCachedNlsConfiguration } from 'vs/workbench/services/extensions/node/nls';
 
 /**
  * @remark Ensure this remains JSON serializable.

@@ -10,7 +10,7 @@ import { ISocket, PersistentProtocol } from 'vs/base/parts/ipc/common/ipc.net';
 import { WebSocketNodeSocket } from 'vs/base/parts/ipc/node/ipc.net';
 import { ILogService } from 'vs/platform/log/common/log';
 import { ConnectionTypeRequest, HandshakeMessage } from 'vs/platform/remote/common/remoteAgentConnection';
-import { ConnectionOptions } from 'vs/server/net/connection/abstractConnection';
+import { ConnectionOptions } from 'vs/server/connection/abstractConnection';
 
 /**
  * Matches `remoteAgentConnection.ts#connectToRemoteExtensionHostAgent`

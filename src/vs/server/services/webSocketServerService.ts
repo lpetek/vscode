@@ -6,26 +6,35 @@
 import { createHash } from 'crypto';
 import { IncomingHttpHeaders } from 'http';
 import * as net from 'net';
+import { VSBuffer } from 'vs/base/common/buffer';
 import { Emitter } from 'vs/base/common/event';
 import { ClientConnectionEvent } from 'vs/base/parts/ipc/common/ipc';
 import { NodeSocket, WebSocketNodeSocket } from 'vs/base/parts/ipc/node/ipc.net';
+import { refineServiceDecorator } from 'vs/platform/instantiation/common/instantiation';
+import { ILogService } from 'vs/platform/log/common/log';
 import product from 'vs/platform/product/common/product';
 import { ConnectionType, connectionTypeToString, IRemoteExtensionHostStartParams } from 'vs/platform/remote/common/remoteAgentConnection';
-import { ConnectionOptions, parseQueryConnectionOptions } from 'vs/server/net/connection/abstractConnection';
-import { ExtensionHostConnection } from 'vs/server/net/connection/extensionHostConnection';
-import { ManagementConnection } from 'vs/server/net/connection/managementConnection';
+import { ConnectionOptions, parseQueryConnectionOptions } from 'vs/server/connection/abstractConnection';
+import { ExtensionHostConnection } from 'vs/server/connection/extensionHostConnection';
+import { ManagementConnection } from 'vs/server/connection/managementConnection';
 import { ServerProtocol } from 'vs/server/protocol';
-import { VSBuffer } from 'vs/base/common/buffer';
-import { AbstractNetRequestHandler, ParsedRequest } from './abstractNetRequestHandler';
+import { AbstractIncomingRequestService, IAbstractIncomingRequestService, ParsedRequest } from 'vs/server/services/abstractIncomingRequestService';
+import { IEnvironmentServerService } from 'vs/server/services/environmentService';
 
 type Connection = ExtensionHostConnection | ManagementConnection;
 
 export type UpgradeListener = (req: ParsedRequest, socket: net.Socket, head: Buffer) => void;
 
+export interface IWebSocketServerService extends IAbstractIncomingRequestService {
+	listen(): void;
+}
+
+export const IWebSocketServerService = refineServiceDecorator<IAbstractIncomingRequestService, IWebSocketServerService>(IAbstractIncomingRequestService);
+
 /**
  * Handles client connections to a editor instance via IPC.
  */
-export class WebSocketHandler extends AbstractNetRequestHandler<UpgradeListener> {
+export class WebSocketServerService extends AbstractIncomingRequestService<UpgradeListener> implements IWebSocketServerService {
 	protected eventName = 'upgrade';
 	private readonly _onDidClientConnect = new Emitter<ClientConnectionEvent>();
 	public readonly onDidClientConnect = this._onDidClientConnect.event;
@@ -47,7 +56,7 @@ export class WebSocketHandler extends AbstractNetRequestHandler<UpgradeListener>
 		return connectionMap;
 	}
 
-	protected eventListener: UpgradeListener = (req, socket, head) => {
+	protected eventListener: UpgradeListener = async (req, socket, head) => {
 		if (req.headers['upgrade'] !== 'websocket' || !req.url) {
 			const errorMessage = `failed to upgrade for header "${req.headers['upgrade']}" and url: "${req.url}".`;
 			this.logService.error(errorMessage);
@@ -78,7 +87,7 @@ export class WebSocketHandler extends AbstractNetRequestHandler<UpgradeListener>
 		const protocol = new ServerProtocol(new WebSocketNodeSocket(new NodeSocket(socket), permessageDeflate, null, permessageDeflate), this.logService, connectionOptions, VSBuffer.wrap(head));
 
 		try {
-			this.connect(protocol);
+			await this.connect(protocol);
 		} catch (error: any) {
 			protocol.dispose(error.message);
 		}
@@ -165,6 +174,14 @@ export class WebSocketHandler extends AbstractNetRequestHandler<UpgradeListener>
 		for (let i = 0, max = offline.length - this.maxExtraOfflineConnections; i < max; ++i) {
 			offline[i].dispose('old');
 		}
+	}
+
+	constructor(
+		netServer: net.Server,
+		@IEnvironmentServerService environmentService: IEnvironmentServerService,
+		@ILogService logService: ILogService,
+	) {
+		super(netServer, environmentService, logService);
 	}
 }
 

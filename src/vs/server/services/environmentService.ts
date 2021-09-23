@@ -4,26 +4,28 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as path from 'path';
-import { Schemas } from 'vs/base/common/network';
-import { URI } from 'vs/base/common/uri';
-import { NativeEnvironmentService } from 'vs/platform/environment/node/environmentService';
-import { getLogLevel } from 'vs/platform/log/common/log';
-import { toWorkspaceFolder } from 'vs/platform/workspace/common/workspace';
-import { getLocaleFromConfig, getCachedNlsConfiguration } from 'vs/workbench/services/extensions/node/nls';
-import { IWebWorkspace, IWorkbenchConfigurationSerialized } from 'vs/platform/workspaces/common/workbench';
 import { memoize } from 'vs/base/common/decorators';
+import { Schemas } from 'vs/base/common/network';
+import { IProductConfiguration } from 'vs/base/common/product';
 import { Writeable } from 'vs/base/common/types';
+import { URI } from 'vs/base/common/uri';
+import { NLSConfiguration } from 'vs/base/node/languagePacks';
 import { NativeParsedArgs } from 'vs/platform/environment/common/argv';
 import { INativeEnvironmentService } from 'vs/platform/environment/common/environment';
+import { NativeEnvironmentService } from 'vs/platform/environment/node/environmentService';
 import { refineServiceDecorator } from 'vs/platform/instantiation/common/instantiation';
+import { getLogLevel } from 'vs/platform/log/common/log';
 import { IProductService } from 'vs/platform/product/common/productService';
-import { ParsedRequest } from '../net/abstractNetRequestHandler';
-import { IProductConfiguration } from 'vs/base/common/product';
+import { toWorkspaceFolder } from 'vs/platform/workspace/common/workspace';
+import { IWebWorkspace, IWorkbenchConfigurationSerialized } from 'vs/platform/workspaces/common/workbench';
+import { getCachedNlsConfiguration, getLocaleFromConfig } from 'vs/workbench/services/extensions/node/nls';
+import { ParsedRequest } from './abstractIncomingRequestService';
 
 export interface IEnvironmentServerService extends INativeEnvironmentService {
-	extensionEnabledProposedApi: string[] | undefined;
+	readonly serverUrl: URL;
+	readonly extensionEnabledProposedApi: string[] | undefined;
 	createWorkbenchWebConfiguration: (req: ParsedRequest) => Promise<IWorkbenchConfigurationSerialized>;
-	protocol: string;
+	nlsConfigurationPromise: Promise<NLSConfiguration>
 }
 
 export const IEnvironmentServerService = refineServiceDecorator<INativeEnvironmentService, IEnvironmentServerService>(INativeEnvironmentService);
@@ -123,9 +125,9 @@ export class EnvironmentServerService extends NativeEnvironmentService implement
 	 * Dynamic properties should be applied in `createWorkbenchWebConfiguration`
 	 */
 	@memoize
-	private get staticWorkbenchWebConfigurationPromise(): Promise<IStaticWorkbenchWebConfiguration> {
-		return new Promise(async resolve => {
-			resolve(<IStaticWorkbenchWebConfiguration>{
+	private get staticWorkbenchWebConfigurationPromise() {
+		return new Promise<IStaticWorkbenchWebConfiguration>(async resolve => {
+			resolve({
 				workspaceProvider: {
 					payload: [
 						['userDataPath', this.userDataPath],
@@ -135,8 +137,17 @@ export class EnvironmentServerService extends NativeEnvironmentService implement
 				developmentOptions: {
 					logLevel: getLogLevel(this),
 				},
-				nlsConfiguration: await getCachedNlsConfiguration(this.args.locale || (await getLocaleFromConfig(this.userDataPath)), this.userDataPath, this.commit),
+				nlsConfiguration: await this.nlsConfigurationPromise,
 			});
+		});
+	}
+
+	@memoize
+	public get nlsConfigurationPromise() {
+		return new Promise<NLSConfiguration>(async (resolve) => {
+			const locale = this.args.locale || (await getLocaleFromConfig(this.userDataPath));
+
+			resolve(getCachedNlsConfiguration(locale, this.userDataPath, this.commit));
 		});
 	}
 
@@ -182,8 +193,8 @@ export class EnvironmentServerService extends NativeEnvironmentService implement
 	}
 
 	@memoize
-	public get protocol(): string {
-		return this.configuration.serverUrl.protocol;
+	public get serverUrl(): URL {
+		return this.configuration.serverUrl;
 	}
 
 	@memoize

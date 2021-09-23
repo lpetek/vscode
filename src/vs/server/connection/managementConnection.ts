@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { ILogService } from 'vs/platform/log/common/log';
-import { AbstractConnection } from 'vs/server/net/connection/abstractConnection';
+import { AbstractConnection } from 'vs/server/connection/abstractConnection';
 import { ServerProtocol } from 'vs/server/protocol';
 
 /**

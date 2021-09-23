@@ -5,9 +5,9 @@
 
 import * as platform from 'vs/base/common/platform';
 import { URI } from 'vs/base/common/uri';
+import { transformIncoming } from 'vs/server/uriTransformer';
 import * as terminal from 'vs/workbench/contrib/terminal/common/remoteTerminalChannel';
 import { AbstractVariableResolverService } from 'vs/workbench/services/configurationResolver/common/variableResolver';
-import { transformIncoming } from 'vs/server/uriTransformer';
 
 // Reference: - ../../workbench/api/common/extHostDebugService.ts
 export class VariableResolverService extends AbstractVariableResolverService {
