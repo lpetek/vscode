@@ -58,7 +58,6 @@
     "extensions-ci": "node --max_old_space_size=4095 ./node_modules/gulp/bin/gulp.js extensions-ci"
   },
   "dependencies": {
-    "@coder/logger": "^1.1.16",
     "@microsoft/applicationinsights-web": "^2.6.4",
     "@vscode/sqlite3": "4.0.12",
     "@vscode/vscode-languagedetection": "1.0.20",
@@ -74,6 +73,7 @@
     "native-watchdog": "1.3.0",
     "node-pty": "0.11.0-beta7",
     "nsfw": "2.1.2",
+    "path-to-regexp": "^6.2.0",
     "proxy-agent": "^4.0.1",
     "proxy-from-env": "^1.1.0",
     "spdlog": "^0.13.0",

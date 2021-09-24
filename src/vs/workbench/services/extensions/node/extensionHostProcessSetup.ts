@@ -23,11 +23,13 @@ import { realpath } from 'vs/base/node/extpath';
 import { IHostUtils } from 'vs/workbench/api/common/extHostExtensionService';
 import { RunOnceScheduler } from 'vs/base/common/async';
 import { boolean } from 'vs/editor/common/config/editorOptions';
-import * as proxyAgent from 'vs/base/node/proxy_agent';
+import { monkeyPatchProxyProtocols } from 'vs/base/node/proxyAgent';
 
 import 'vs/workbench/api/common/extHost.common.services';
 import 'vs/workbench/api/node/extHost.node.services';
-import { createServerURITransformer } from 'vs/base/common/uriServer';
+// eslint-disable-next-line code-import-patterns
+import { createServerURITransformer } from 'vs/server/uriTransformer';
+
 
 interface ParsedExtHostArgs {
 	uriTransformerPath?: string;
@@ -144,11 +146,15 @@ function _createExtHostProtocol(): Promise<PersistentProtocol> {
 
 						// Wait for rich client to reconnect
 						protocol.onSocketClose(() => {
-							// NOTE@coder: Inform the server so we can manage offline
-							// connections there instead. Our goal is to persist connections
-							// forever (to a reasonable point) to account for things like
-							// hibernating overnight.
+							/**
+							 * @coder Inform the server so we can manage offline
+							 * connections there instead. Our goal is to persist connections
+							 * forever (to a reasonable point) to account for things like
+							 * hibernating overnight.
+							 */
 							process.send!({ type: 'VSCODE_EXTHOST_DISCONNECTED' });
+							// The socket has closed, let's give the renderer a certain amount of time to reconnect
+							// disconnectRunner1.schedule();						})
 						});
 					}
 				}
@@ -324,8 +330,8 @@ function connectToRenderer(protocol: IMessagePassingProtocol): Promise<IRenderer
 }
 
 export async function startExtensionHostProcess(): Promise<void> {
-	// NOTE@coder: add proxy agent patch
-	proxyAgent.monkeyPatch(true);
+	/** @coder */
+	monkeyPatchProxyProtocols();
 
 	performance.mark(`code/extHost/willConnectToRenderer`);
 	const protocol = await createExtHostProtocol();

@@ -10,9 +10,7 @@ import * as util from 'util';
 import { CancellationToken } from 'vs/base/common/cancellation';
 import * as vszip from 'vs/base/node/zip';
 import * as nls from 'vs/nls';
-import product from 'vs/platform/product/common/product';
-// eslint-disable-next-line code-import-patterns
-import { IProductConfiguration } from 'vs/workbench/workbench.web.api';
+import { IProductConfiguration } from 'vs/base/common/product';
 
 // We will be overriding these, so keep a reference to the original.
 const vszipExtract = vszip.extract;
@@ -161,7 +159,7 @@ const extractTar = async (tarPath: string, targetPath: string, options: vszip.IE
  * Override original functionality so we can use a custom marketplace with
  * either tars or zips.
  */
-export const enableCustomMarketplace = (): void => {
+export const enableCustomMarketplace = (product: IProductConfiguration): void => {
 	const extensionsGallery: IProductConfiguration['extensionsGallery'] = {
 		serviceUrl: process.env.SERVICE_URL || 'https://extensions.coder.com/api',
 		resourceUrlTemplate: '',

@@ -5,6 +5,7 @@
 
 import { Schemas } from 'vs/base/common/network';
 import { IRawURITransformer, UriParts, URITransformer } from 'vs/base/common/uriIpc';
+import { URI, UriComponents } from 'vs/base/common/uri';
 
 /**
  * Transforms URIs such that incoming and outgoing requests are directed to their
@@ -47,4 +48,9 @@ class RawURITransformer implements IRawURITransformer {
  */
 export function createServerURITransformer(authority: string) {
 	return new URITransformer(new RawURITransformer(authority));
+}
+
+export function transformIncoming(remoteAuthority: string, uri: UriComponents | undefined): URI | undefined {
+	const transformer = createServerURITransformer(remoteAuthority);
+	return uri ? URI.revive(transformer.transformIncoming(uri)) : uri;
 }

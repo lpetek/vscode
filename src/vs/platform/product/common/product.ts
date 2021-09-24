@@ -55,30 +55,24 @@ else {
 	if (Object.keys(product).length === 0) {
 		Object.assign(product, {
 			version: '1.60.0-dev',
-			nameShort: 'Code - OSS Dev',
-			nameLong: 'Code - OSS Dev',
-			applicationName: 'code-oss',
+			nameShort: 'Code Server - Dev',
+			nameLong: 'Code Server - Dev',
+			applicationName: 'code-server',
 			dataFolderName: '.vscode-oss',
 			urlProtocol: 'code-oss',
-			reportIssueUrl: 'https://github.com/microsoft/vscode/issues/new',
+			reportIssueUrl: 'https://github.com/cdr/code-server/issues/new',
 			licenseName: 'MIT',
-			licenseUrl: 'https://github.com/microsoft/vscode/blob/main/LICENSE.txt',
+			licenseUrl: 'https://github.com/cdr/code-server/blob/main/LICENSE.txt',
 			extensionAllowedProposedApi: [
 				'ms-vscode.vscode-js-profile-flame',
 				'ms-vscode.vscode-js-profile-table',
 				'ms-vscode.remotehub',
 				'ms-vscode.remotehub-insiders',
 				'GitHub.remotehub',
-				'GitHub.remotehub-insiders'
+				'GitHub.remotehub-insiders',
+				'coder.vscode-link'
 			],
 		});
-	}
-
-	// NOTE@coder: Add the ability to inject settings from the server.
-	const el = document.getElementById('vscode-remote-product-configuration');
-	const rawProductConfiguration = el && el.getAttribute('data-settings');
-	if (rawProductConfiguration) {
-		Object.assign(product, JSON.parse(rawProductConfiguration));
 	}
 }
 
