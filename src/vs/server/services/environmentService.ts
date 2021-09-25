@@ -24,6 +24,9 @@ import { ParsedRequest } from './abstractIncomingRequestService';
 export interface IEnvironmentServerService extends INativeEnvironmentService {
 	readonly serverUrl: URL;
 	readonly extensionEnabledProposedApi: string[] | undefined;
+	readonly applicationName: string;
+	readonly commit: string;
+	readonly version: string;
 	createWorkbenchWebConfiguration: (req: ParsedRequest) => Promise<IWorkbenchConfigurationSerialized>;
 	nlsConfigurationPromise: Promise<NLSConfiguration>
 }
@@ -137,6 +140,9 @@ export class EnvironmentServerService extends NativeEnvironmentService implement
 				developmentOptions: {
 					logLevel: getLogLevel(this),
 				},
+				settingsSyncOptions: {
+					enabled: true,
+				},
 				nlsConfiguration: await this.nlsConfigurationPromise,
 			});
 		});
@@ -200,6 +206,16 @@ export class EnvironmentServerService extends NativeEnvironmentService implement
 	@memoize
 	public get commit(): string {
 		return this.productService.commit || 'development';
+	}
+
+	@memoize
+	public get version(): string {
+		return this.productService.version;
+	}
+
+	@memoize
+	public get applicationName(): string {
+		return this.productService.applicationName;
 	}
 
 	@memoize

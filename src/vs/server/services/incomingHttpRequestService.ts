@@ -19,6 +19,8 @@ import { IEnvironmentServerService } from 'vs/server/services/environmentService
 import { IServerThemeService } from 'vs/server/services/themeService';
 
 const APP_ROOT = join(__dirname, '..', '..', '..', '..');
+const WORKBENCH_PATH = join(APP_ROOT, 'src', 'vs', 'code', 'browser', 'workbench');
+
 
 const paths = {
 	WEBVIEW: join(APP_ROOT, 'out/vs/workbench/contrib/webview/browser/pre'),
@@ -126,8 +128,9 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 	private callbackUriToRequestId = new Map<string, Callback>();
 
 	private templates = {
-		workbenchDev: readFileSync(join(APP_ROOT, 'src', 'vs', 'code', 'browser', 'workbench', 'workbench-dev.html')).toString(),
-		workbenchProd: readFileSync(join(APP_ROOT, 'src', 'vs', 'code', 'browser', 'workbench', 'workbench.html')).toString(),
+		workbenchError: readFileSync(join(WORKBENCH_PATH, 'workbench-error.html')).toString(),
+		workbenchDev: readFileSync(join(WORKBENCH_PATH, 'workbench-dev.html')).toString(),
+		workbenchProd: readFileSync(join(WORKBENCH_PATH, 'workbench.html')).toString(),
 		callback: readFileSync(join(APP_ROOT, 'resources', 'web', 'callback.html')).toString(),
 	};
 
@@ -354,13 +357,29 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 		}
 	};
 
-	serveError = (req: ParsedRequest, res: ServerResponse, errorCode: number, errorMessage: string, responseHeaders = Object.create(null)): void => {
-		responseHeaders['Content-Type'] = PLAIN_TEXT_MIME_TYPE;
-		res.writeHead(errorCode, responseHeaders);
+	serveError = (req: ParsedRequest, res: ServerResponse, code: number, message: string): void => {
+		this.logService.trace(`[${req.parsedUrl.toString()}] ${code}: ${message}`);
 
-		this.logService.trace(`[${req.parsedUrl.toString()}] ${errorCode}: ${errorMessage}`);
+		const { applicationName, commit, version } = this.environmentService;
 
-		res.end(errorMessage);
+		res.statusCode = code;
+		res.statusMessage = message;
+
+		if (req.parsedUrl.pathname.endsWith('.json')) {
+			res.setHeader('Content-Type', 'application/json');
+
+			res.end(JSON.stringify({ code, message }));
+			return;
+		}
+
+		const content = this.templates.workbenchError
+			.replace('{{ERROR_HEADER}}', `${applicationName}`)
+			.replace('{{ERROR_CODE}}', code.toString())
+			.replace('{{ERROR_MESSAGE}}', message)
+			.replace('{{ERROR_FOOTER}}', `${version} — ${commit}`);
+
+		res.setHeader('Content-Type', 'text/html');
+		res.end(content);
 	};
 
 
