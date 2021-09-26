@@ -15,15 +15,46 @@
 		<link rel="manifest" href="./manifest.json">
 
 		<meta name="theme-color" content="{{CLIENT_BACKGROUND_COLOR}}">
+
+		<style>
+			* {
+				box-sizing: border-box;
+			}
+
+			body {
+				margin: 0;
+				height: 100vh;
+				font-size: 16px;
+			}
+			main {
+				display: grid;
+				justify-content: center;
+				align-content: space-between;
+				grid-template-rows: 1fr 4fr 1fr;
+				grid-gap: 8px;
+				padding: 8px;
+				font-family: monospace;
+				height: 100%;
+			}
+
+			footer {
+				place-self: end center;
+				font-size: .75rem;
+			}
+		</style>
 	</head>
 
-	<body style="background-color: {{CLIENT_BACKGROUND_COLOR}};" aria-label="">
-		<header>
-			<h1>{{ERROR_HEADER}}</h1>
-			<h2>Error {{ERROR_CODE}}</h2>
-		</header>
+	<body style="background-color: {{CLIENT_BACKGROUND_COLOR}}; color: {{CLIENT_FOREGROUND_COLOR}}" aria-label="">
 
-		<main>{{ERROR_MESSAGE}}</main>
-		<footer>{{ERROR_FOOTER}}</footer>
+		<main>
+			<header>
+				<h1>{{ERROR_HEADER}}</h1>
+			</header>
+			<section>
+				<h2>⚠️ Error {{ERROR_CODE}}</h2>
+				{{ERROR_MESSAGE}}
+			</section>
+			<footer>{{ERROR_FOOTER}}</footer>
+		</main>
 	</body>
 </html>

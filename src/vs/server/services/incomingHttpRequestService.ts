@@ -13,7 +13,7 @@ import { UriComponents } from 'vs/base/common/uri';
 import { ProtocolConstants } from 'vs/base/parts/ipc/common/ipc.net';
 import { refineServiceDecorator } from 'vs/platform/instantiation/common/instantiation';
 import { ILogService } from 'vs/platform/log/common/log';
-import { editorBackground } from 'vs/platform/theme/common/colorRegistry';
+import { editorBackground, editorForeground } from 'vs/platform/theme/common/colorRegistry';
 import { AbstractIncomingRequestService, IAbstractIncomingRequestService, ParsedRequest } from 'vs/server/services/abstractIncomingRequestService';
 import { IEnvironmentServerService } from 'vs/server/services/environmentService';
 import { IServerThemeService } from 'vs/server/services/themeService';
@@ -117,18 +117,30 @@ const contentSecurityPolicies: Record<string, string> = {
 	].join(' ')
 };
 
-interface WorkbenchTemplate {
-	WORKBENCH_WEB_CONFIGURATION: IWorkbenchConfigurationSerialized;
-	WORKBENCH_BUILTIN_EXTENSIONS: Array<never>;
+interface BaseWorkbenchTemplate {
 	CLIENT_BACKGROUND_COLOR: string;
+	CLIENT_FOREGROUND_COLOR: string;
 	CSP_NONCE: string;
 }
 
-interface WorkbenchErrorTemplate {
+
+interface WorkbenchTemplate extends BaseWorkbenchTemplate {
+	WORKBENCH_WEB_CONFIGURATION: IWorkbenchConfigurationSerialized;
+	WORKBENCH_BUILTIN_EXTENSIONS: Array<never>;
+	CLIENT_BACKGROUND_COLOR: string;
+	CLIENT_FOREGROUND_COLOR: string;
+}
+
+interface WorkbenchErrorTemplate extends BaseWorkbenchTemplate {
 	ERROR_HEADER: string;
 	ERROR_CODE: string;
 	ERROR_MESSAGE: string;
 	ERROR_FOOTER: string;
+}
+
+interface ClientTheme {
+	backgroundColor: string;
+	foregroundColor: string;
 }
 
 export interface IIncomingHTTPRequestService extends IAbstractIncomingRequestService {
@@ -176,7 +188,7 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 			return this.serveError(req, res, 500, 'Internal Server Error.');
 		}
 
-		return this.serveError(req, res, 404, `${req.parsedUrl.pathname} Not found.`);
+		return this.serveError(req, res, 404, `"${req.parsedUrl.pathname}" not found.`);
 	};
 
 	/**
@@ -198,14 +210,14 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 	 */
 	private $webManifest: WebRequestListener = async (req, res) => {
 		const { productConfiguration } = await this.environmentService.createWorkbenchWebConfiguration(req);
-		const clientBackgroundColor = await this.fetchClientBackgroundColor();
+		const clientTheme = await this.fetchClientTheme();
 
 		const webManifest: WebManifest = {
 			name: productConfiguration.nameLong!,
 			short_name: productConfiguration.nameShort!,
 			start_url: req.pathPrefix,
 			display: 'fullscreen',
-			'background-color': clientBackgroundColor,
+			'background-color': clientTheme.backgroundColor,
 			description: 'Run editors on a remote server.',
 			// icons: productConfiguration.icons || [],
 			icons: [],
@@ -230,7 +242,7 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 	private $root: WebRequestListener = async (req, res) => {
 		const webConfigJSON = await this.environmentService.createWorkbenchWebConfiguration(req);
 		const { isBuilt } = this.environmentService;
-		const clientBackgroundColor = await this.fetchClientBackgroundColor();
+		const clientTheme = await this.fetchClientTheme();
 
 		res.writeHead(200, {
 			'Content-Type': 'text/html',
@@ -246,7 +258,8 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 			// Inject server-side workbench configuration for client-side workbench.
 			WORKBENCH_WEB_CONFIGURATION: webConfigJSON,
 			WORKBENCH_BUILTIN_EXTENSIONS: [],
-			CLIENT_BACKGROUND_COLOR: clientBackgroundColor,
+			CLIENT_BACKGROUND_COLOR: clientTheme.backgroundColor,
+			CLIENT_FOREGROUND_COLOR: clientTheme.foregroundColor,
 			// WORKBENCH_AUTH_SESSION: authSessionInfo ? escapeJSON(authSessionInfo) : '',
 			CSP_NONCE,
 		})
@@ -386,7 +399,7 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 		}
 	};
 
-	serveError = (req: ParsedRequest, res: ServerResponse, code: number, message: string): void => {
+	serveError = async (req: ParsedRequest, res: ServerResponse, code: number, message: string): Promise<void> => {
 		this.logService.debug(`[${req.parsedUrl.toString()}] ${code}: ${message}`);
 
 		const { applicationName, commit, version } = this.environmentService;
@@ -402,6 +415,7 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 		}
 
 		const template = this.templates.workbenchError;
+		const clientTheme = await this.fetchClientTheme();
 
 		res.setHeader('Content-Type', 'text/html');
 		res.end(template({
@@ -409,6 +423,9 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 			ERROR_CODE: code.toString(),
 			ERROR_MESSAGE: message,
 			ERROR_FOOTER: `${version} — ${commit}`,
+			CSP_NONCE,
+			CLIENT_BACKGROUND_COLOR: clientTheme.backgroundColor,
+			CLIENT_FOREGROUND_COLOR: clientTheme.foregroundColor,
 		}));
 	};
 
@@ -420,12 +437,13 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 		this.callbackUriToRequestId.clear();
 	}
 
-	private async fetchClientBackgroundColor(): Promise<string> {
+	private async fetchClientTheme(): Promise<ClientTheme> {
 		const theme = await this.themeService.fetchColorThemeData();
 
-		const backgroundColor = theme.getColor(editorBackground, true);
-
-		return backgroundColor!.toString();
+		return {
+			backgroundColor: theme.getColor(editorBackground, true)!.toString(),
+			foregroundColor: theme.getColor(editorForeground, true)!.toString(),
+		};
 	}
 
 	/**
