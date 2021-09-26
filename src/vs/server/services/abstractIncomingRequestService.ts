@@ -6,7 +6,6 @@
 import { Serializable } from 'child_process';
 import * as http from 'http';
 import * as net from 'net';
-import * as path from 'path';
 import { Disposable } from 'vs/base/common/lifecycle';
 import { createDecorator } from 'vs/platform/instantiation/common/instantiation';
 import { ILogService } from 'vs/platform/log/common/log';
@@ -41,7 +40,7 @@ export abstract class AbstractIncomingRequestService<E extends NetEventListener>
 
 		Object.assign(req, {
 			parsedUrl,
-			pathPrefix: relativeRoot(parsedUrl),
+			pathPrefix: parsedUrl.pathname,
 		});
 
 		this.eventListener(req as ParsedRequest, ...args);
@@ -62,22 +61,5 @@ export abstract class AbstractIncomingRequestService<E extends NetEventListener>
 		}
 	}
 }
-
-/**
- * Generates a prefix used to normalize a request's base path.
- * @remark This is especially useful when serving the editor from directory.
- * e.g. `"localhost:8080/some/user/path/"
- *
- * @example:
- * / => .
- * /foo => .
- * /foo/ => ./..
- * /foo/bar => ./..
- * /foo/bar/ => ./../..
- */
-export const relativeRoot = (url: URL): string => {
-	const depth = (url.pathname.match(/\//g) || []).length;
-	return path.normalize('./' + (depth > 1 ? '../'.repeat(depth - 1) : ''));
-};
 
 export const escapeJSON = (value: Serializable) => JSON.stringify(value).replace(/"/g, '&quot;');

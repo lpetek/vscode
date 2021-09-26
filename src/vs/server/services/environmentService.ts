@@ -88,7 +88,7 @@ export class EnvironmentServerService extends NativeEnvironmentService implement
 			// Endpoints
 			logoutEndpointUrl: logoutEndpointUrl.toString(),
 			webEndpointUrl: this.createRequestUrl(req, '/static').toString(),
-
+			webEndpointUrlTemplate: this.createRequestUrl(req, '/static').toString(),
 			icons: [
 				{
 					src: this.createRequestUrl(req, '/static/src/browser/media/pwa-icon-192.png').toString(),
@@ -143,6 +143,7 @@ export class EnvironmentServerService extends NativeEnvironmentService implement
 				settingsSyncOptions: {
 					enabled: true,
 				},
+				__uniqueWebWorkerExtensionHostOrigin: true,
 				nlsConfiguration: await this.nlsConfigurationPromise,
 			});
 		});

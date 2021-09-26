@@ -83,6 +83,13 @@ export interface IWorkbenchConfigurationSerialized extends IWebWorkspace {
 	readonly webviewEndpoint: string;
 
 	/**
+	 * [TEMPORARY]: This will be removed soon.
+	 * Use an unique origin for the web worker extension host.
+	 * Defaults to false.
+	 */
+	readonly __uniqueWebWorkerExtensionHostOrigin?: boolean;
+
+	/**
 	 * A handler for opening workspaces and providing the initial workspace.
 	 */
 	readonly workspaceProvider: IWebWorkspaceProvider;

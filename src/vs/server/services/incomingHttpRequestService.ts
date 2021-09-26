@@ -124,6 +124,8 @@ export interface IIncomingHTTPRequestService extends IAbstractIncomingRequestSer
 export const IIncomingHTTPRequestService = refineServiceDecorator<IAbstractIncomingRequestService, IIncomingHTTPRequestService>(IAbstractIncomingRequestService);
 
 export class IncomingHTTPRequestService extends AbstractIncomingRequestService<WebRequestListener> implements IIncomingHTTPRequestService {
+	private logName = '[Incoming HTTP Service]';
+
 	/** Stored callback URI's sent over from client-side `PollingURLCallbackProvider`. */
 	private callbackUriToRequestId = new Map<string, Callback>();
 
@@ -160,7 +162,7 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 			return this.serveError(req, res, 500, 'Internal Server Error.');
 		}
 
-		return this.serveError(req, res, 404, 'Not found.');
+		return this.serveError(req, res, 404, `${req.parsedUrl.pathname} Not found.`);
 	};
 
 	/**
@@ -223,8 +225,6 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 			.replace('{{WORKBENCH_WEB_CONFIGURATION}}', () => escapeJSON(webConfigJSON))
 			.replace('{{WORKBENCH_BUILTIN_EXTENSIONS}}', () => escapeJSON([]))
 			.replace(/{{CLIENT_BACKGROUND_COLOR}}/g, () => clientBackgroundColor)
-
-			.replace(/{{PATH_PREFIX}}/g, req.pathPrefix)
 			.replace(/{{CSP_NONCE}}/g, CSP_NONCE);
 		// .replace('{{WORKBENCH_AUTH_SESSION}}', () => (authSessionInfo ? escapeJSON(authSessionInfo) : ''));
 
@@ -234,6 +234,18 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 		});
 
 		return res.end(content);
+	};
+
+	/**
+ * Web Config endpoint.
+ * @remark This can be helpful in debugging a server-side configuration.
+ */
+	private $webConfig: WebRequestListener = async (req, res) => {
+		const webConfigJSON = await this.environmentService.createWorkbenchWebConfiguration(req);
+
+		res.writeHead(200, { 'Content-Type': 'application/json' });
+
+		return res.end(JSON.stringify(webConfigJSON, null, 2));
 	};
 
 	/**
@@ -358,7 +370,7 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 	};
 
 	serveError = (req: ParsedRequest, res: ServerResponse, code: number, message: string): void => {
-		this.logService.trace(`[${req.parsedUrl.toString()}] ${code}: ${message}`);
+		this.logService.debug(`[${req.parsedUrl.toString()}] ${code}: ${message}`);
 
 		const { applicationName, commit, version } = this.environmentService;
 
@@ -422,10 +434,17 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 			['/static/(.*)', this.$static],
 			['/webview/(.*)', this.$webview],
 			['/', this.$root],
+			['/.json', this.$webConfig],
 			['/callback', this.$callback],
 			['/fetch-callback', this.$fetchCallback],
 			['/vscode-remote-resource', this.$remoteResource],
 		];
+
+		this.logService.debug(this.logName, 'Listening for the following routes:');
+
+		for (const [pattern] of routePairs) {
+			this.logService.debug(this.logName, pattern);
+		}
 
 		this.routes = new Map(routePairs.map(([pattern, handler]) => [match(pattern, matcherOptions), handler]));
 
