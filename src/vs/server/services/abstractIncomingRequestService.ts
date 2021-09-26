@@ -3,7 +3,6 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { Serializable } from 'child_process';
 import * as http from 'http';
 import * as net from 'net';
 import { Disposable } from 'vs/base/common/lifecycle';
@@ -61,5 +60,3 @@ export abstract class AbstractIncomingRequestService<E extends NetEventListener>
 		}
 	}
 }
-
-export const escapeJSON = (value: Serializable) => JSON.stringify(value).replace(/"/g, '&quot;');

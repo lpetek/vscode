@@ -420,12 +420,11 @@ class WindowIndicator implements IWindowIndicator {
 (function () {
 	// Find config by checking for DOM
 	const configElement = document.getElementById('vscode-workbench-web-configuration');
-	const configElementAttribute = configElement ? configElement.getAttribute('data-settings') : undefined;
-	if (!configElement || !configElementAttribute) {
+	if (!configElement || !configElement.textContent) {
 		throw new Error('Missing web configuration element');
 	}
 
-	const config: IWorkbenchConstructionOptions & IWebWorkspace = JSON.parse(configElementAttribute);
+	const config: IWorkbenchConstructionOptions & IWebWorkspace = JSON.parse(configElement.textContent);
 
 	// Find workspace to open and payload
 	let foundWorkspace = false;

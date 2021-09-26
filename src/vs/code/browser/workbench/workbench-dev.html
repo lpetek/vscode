@@ -10,20 +10,20 @@
 		<!-- Disable pinch zooming -->
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
 
-		<!-- Workbench Configuration -->
-		<meta id="vscode-workbench-web-configuration" data-settings="{{WORKBENCH_WEB_CONFIGURATION}}">
 
 		<!-- Workbench Auth Session -->
 		<meta id="vscode-workbench-auth-session" data-settings="{{WORKBENCH_AUTH_SESSION}}">
 
 		<!-- Builtin Extensions (running out of sources) -->
-		<meta id="vscode-workbench-builtin-extensions" data-settings="{{WORKBENCH_BUILTIN_EXTENSIONS}}">
+		<meta id="vscode-workbench-builtin-extensions" data-settings="{{{WORKBENCH_BUILTIN_EXTENSIONS}}}">
 
 		<!-- Workbench Icon/Manifest/CSS -->
 		<link rel="icon" href="./favicon.ico" type="image/x-icon" />
 		<link rel="manifest" href="./manifest.json">
-
 		<meta name="theme-color" content="{{CLIENT_BACKGROUND_COLOR}}">
+
+		<!-- Workbench Configuration -->
+		<script id="vscode-workbench-web-configuration" type="application/json">{{{toJSON WORKBENCH_WEB_CONFIGURATION}}}</script>
 	</head>
 
 	<body style="background-color: {{CLIENT_BACKGROUND_COLOR}};" aria-label="">

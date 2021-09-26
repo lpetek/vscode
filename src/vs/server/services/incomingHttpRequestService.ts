@@ -14,19 +14,19 @@ import { ProtocolConstants } from 'vs/base/parts/ipc/common/ipc.net';
 import { refineServiceDecorator } from 'vs/platform/instantiation/common/instantiation';
 import { ILogService } from 'vs/platform/log/common/log';
 import { editorBackground } from 'vs/platform/theme/common/colorRegistry';
-import { AbstractIncomingRequestService, escapeJSON, IAbstractIncomingRequestService, ParsedRequest } from 'vs/server/services/abstractIncomingRequestService';
+import { AbstractIncomingRequestService, IAbstractIncomingRequestService, ParsedRequest } from 'vs/server/services/abstractIncomingRequestService';
 import { IEnvironmentServerService } from 'vs/server/services/environmentService';
 import { IServerThemeService } from 'vs/server/services/themeService';
+import * as Handlebars from 'handlebars';
+import { IWorkbenchConfigurationSerialized } from 'vs/platform/workspaces/common/workbench';
 
 const APP_ROOT = join(__dirname, '..', '..', '..', '..');
 const WORKBENCH_PATH = join(APP_ROOT, 'src', 'vs', 'code', 'browser', 'workbench');
-
 
 const paths = {
 	WEBVIEW: join(APP_ROOT, 'out/vs/workbench/contrib/webview/browser/pre'),
 	FAVICON: join(APP_ROOT, 'resources', 'win32', 'code.ico'),
 };
-
 
 /** Matching the given keys in `PollingURLCallbackProvider.QUERY_KEYS` */
 const wellKnownKeys = [
@@ -117,6 +117,20 @@ const contentSecurityPolicies: Record<string, string> = {
 	].join(' ')
 };
 
+interface WorkbenchTemplate {
+	WORKBENCH_WEB_CONFIGURATION: IWorkbenchConfigurationSerialized;
+	WORKBENCH_BUILTIN_EXTENSIONS: Array<never>;
+	CLIENT_BACKGROUND_COLOR: string;
+	CSP_NONCE: string;
+}
+
+interface WorkbenchErrorTemplate {
+	ERROR_HEADER: string;
+	ERROR_CODE: string;
+	ERROR_MESSAGE: string;
+	ERROR_FOOTER: string;
+}
+
 export interface IIncomingHTTPRequestService extends IAbstractIncomingRequestService {
 	listen(): void;
 }
@@ -130,9 +144,9 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 	private callbackUriToRequestId = new Map<string, Callback>();
 
 	private templates = {
-		workbenchError: readFileSync(join(WORKBENCH_PATH, 'workbench-error.html')).toString(),
-		workbenchDev: readFileSync(join(WORKBENCH_PATH, 'workbench-dev.html')).toString(),
-		workbenchProd: readFileSync(join(WORKBENCH_PATH, 'workbench.html')).toString(),
+		workbenchError: Handlebars.compile<WorkbenchErrorTemplate>(readFileSync(join(WORKBENCH_PATH, 'workbench-error.html')).toString()),
+		workbenchDev: Handlebars.compile<WorkbenchTemplate>(readFileSync(join(WORKBENCH_PATH, 'workbench-dev.html')).toString()),
+		workbenchProd: Handlebars.compile<WorkbenchTemplate>(readFileSync(join(WORKBENCH_PATH, 'workbench.html')).toString()),
 		callback: readFileSync(join(APP_ROOT, 'resources', 'web', 'callback.html')).toString(),
 	};
 
@@ -218,22 +232,25 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 		const { isBuilt } = this.environmentService;
 		const clientBackgroundColor = await this.fetchClientBackgroundColor();
 
-		// TODO: investigate auth session for authentication.
-		// const authSessionInfo = null;
-		const content = this.templates[isBuilt ? 'workbenchProd' : 'workbenchDev']
-			// Inject server-side workbench configuration for client-side workbench.
-			.replace('{{WORKBENCH_WEB_CONFIGURATION}}', () => escapeJSON(webConfigJSON))
-			.replace('{{WORKBENCH_BUILTIN_EXTENSIONS}}', () => escapeJSON([]))
-			.replace(/{{CLIENT_BACKGROUND_COLOR}}/g, () => clientBackgroundColor)
-			.replace(/{{CSP_NONCE}}/g, CSP_NONCE);
-		// .replace('{{WORKBENCH_AUTH_SESSION}}', () => (authSessionInfo ? escapeJSON(authSessionInfo) : ''));
-
 		res.writeHead(200, {
 			'Content-Type': 'text/html',
 			[isBuilt ? 'Content-Security-Policy' : 'Content-Security-Policy-Report-Only']: this.contentSecurityPolicyHeaderContent
 		});
 
-		return res.end(content);
+
+		// TODO: investigate auth session for authentication.
+		// const authSessionInfo = null;
+		const template = this.templates[isBuilt ? 'workbenchProd' : 'workbenchDev'];
+
+		return res.end(template({
+			// Inject server-side workbench configuration for client-side workbench.
+			WORKBENCH_WEB_CONFIGURATION: webConfigJSON,
+			WORKBENCH_BUILTIN_EXTENSIONS: [],
+			CLIENT_BACKGROUND_COLOR: clientBackgroundColor,
+			// WORKBENCH_AUTH_SESSION: authSessionInfo ? escapeJSON(authSessionInfo) : '',
+			CSP_NONCE,
+		})
+		);
 	};
 
 	/**
@@ -384,14 +401,15 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 			return;
 		}
 
-		const content = this.templates.workbenchError
-			.replace('{{ERROR_HEADER}}', `${applicationName}`)
-			.replace('{{ERROR_CODE}}', code.toString())
-			.replace('{{ERROR_MESSAGE}}', message)
-			.replace('{{ERROR_FOOTER}}', `${version} — ${commit}`);
+		const template = this.templates.workbenchError;
 
 		res.setHeader('Content-Type', 'text/html');
-		res.end(content);
+		res.end(template({
+			ERROR_HEADER: `${applicationName}`,
+			ERROR_CODE: code.toString(),
+			ERROR_MESSAGE: message,
+			ERROR_FOOTER: `${version} — ${commit}`,
+		}));
 	};
 
 
@@ -425,6 +443,12 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 	) {
 		super(netServer, environmentService, logService);
 		this.themeService = themeService;
+		const { isBuilt } = this.environmentService;
+
+		Handlebars.registerHelper('toJSON', obj => {
+			// Pretty print in development.
+			return JSON.stringify(obj, null, isBuilt ? undefined : 2);
+		});
 
 		const routePairs: readonly RoutePair[] = [
 			['/manifest.webmanifest', this.$webManifest],

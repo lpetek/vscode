@@ -88,12 +88,11 @@ if (typeof navigator === 'object' && !isElectronRenderer) {
 	_language = _locale;
 
 	// NOTE@coder: Make languages work.
-	const el = typeof document !== 'undefined' && document.getElementById('vscode-workbench-web-configuration');
-	const rawWorkbenchConfig = el && el.getAttribute('data-settings');
+	const configElement = typeof document !== 'undefined' && document.getElementById('vscode-workbench-web-configuration');
 
-	if (rawWorkbenchConfig) {
+	if (configElement && configElement.textContent) {
 		try {
-			const workbenchConfig: IWorkbenchConfigurationSerialized = JSON.parse(rawWorkbenchConfig);
+			const workbenchConfig: IWorkbenchConfigurationSerialized = JSON.parse(configElement.textContent);
 			const { nlsConfiguration } = workbenchConfig;
 
 			_locale = nlsConfiguration.locale;
