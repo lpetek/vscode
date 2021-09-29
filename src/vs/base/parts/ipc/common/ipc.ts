@@ -1223,3 +1223,24 @@ export class IPCLogger implements IIPCLogger {
 		logWithColors(this._incomingPrefix, this._totalIncoming, msgLength, requestId, initiator, str, data);
 	}
 }
+
+/**
+ * @coder Utility for finding an event from a given service.
+ * @remark Useful when proxying methods from a client-side service.
+ */
+export function findEvent<T = any>(service: unknown, eventName: string) {
+	const normalized = eventName.substring(
+		eventName.startsWith('$') ? 1 : 0,
+		eventName.endsWith('Event') ? eventName.length - 'Event'.length : undefined);
+
+	return (service as Record<string, Event<T> | undefined>)[normalized];
+}
+/**
+ * @coder Utility for finding an event handler from a given service.
+ * @remark Useful when proxying methods from a client-side service.
+ */
+export function findEventHandler<T = any>(service: unknown, commandName: string) {
+	const normalized = commandName.substring(commandName.startsWith('$') ? 1 : 0);
+
+	return (service as Record<string, (...args: any) => Promise<T> | undefined>)[normalized];
+}

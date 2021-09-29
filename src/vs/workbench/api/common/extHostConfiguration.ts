@@ -10,7 +10,7 @@ import { ExtHostWorkspace, IExtHostWorkspace } from 'vs/workbench/api/common/ext
 import { ExtHostConfigurationShape, MainThreadConfigurationShape, IConfigurationInitData, MainContext } from './extHost.protocol';
 import { ConfigurationTarget as ExtHostConfigurationTarget } from './extHostTypes';
 import { ConfigurationTarget, IConfigurationChange, IConfigurationData, IConfigurationOverrides } from 'vs/platform/configuration/common/configuration';
-import { Configuration, ConfigurationChangeEvent } from 'vs/platform/configuration/common/configurationModels';
+import { Configuration, ConfigurationChangeEvent, ConfigurationModel } from 'vs/platform/configuration/common/configurationModels';
 import { ConfigurationScope, OVERRIDE_PROPERTY_PATTERN } from 'vs/platform/configuration/common/configurationRegistry';
 import { isObject } from 'vs/base/common/types';
 import { ExtensionIdentifier, IExtensionDescription } from 'vs/platform/extensions/common/extensions';
@@ -123,6 +123,35 @@ export class ExtHostConfiguration implements ExtHostConfigurationShape {
 
 	$acceptConfigurationChanged(data: IConfigurationInitData, change: IConfigurationChange): void {
 		this.getConfigProvider().then(provider => provider.$acceptConfigurationChanged(data, change));
+	}
+}
+
+/**
+ * @coder Added as a light-weight replacement in `VariableResolverService`
+ */
+export class SimpleConfigProvider {
+	private config: Configuration;
+
+	constructor(
+		resolvedVariables: Record<string, string | undefined>
+	) {
+		const configModel = new ConfigurationModel();
+		// See `RemoteTerminalClient#createProcess`
+		const prefix = 'config:';
+		for (const [key, value] of Object.entries(resolvedVariables)) {
+			const normalizedKey = key.substring(key.startsWith(prefix) ? prefix.length : 0);
+
+			configModel.setValue(normalizedKey, value);
+		}
+
+		this.config = new Configuration(configModel, new ConfigurationModel());
+	}
+	getValue<T>(section: string, scope?: vscode.ConfigurationScope | null, defaultValue?: T): T | undefined {
+		const overrides = scopeToOverrides(scope) || {};
+
+		const value: T = this.config.getValue(section, overrides, undefined);
+
+		return typeof value === 'undefined' ? defaultValue : value;
 	}
 }
 

@@ -348,6 +348,17 @@ export function getDefaultShellArgs(
 	return args;
 }
 
+/**
+ * @coder Added for convenience.
+ */
+export function getShellSettingName(
+	type: 'automationShell' | 'shell',
+	platformOverride: Platform = platform,
+): string {
+	const platformKey = platformOverride === Platform.Windows ? 'windows' : platformOverride === Platform.Mac ? 'osx' : 'linux';
+	return <TerminalShellSetting>`terminal.integrated.${type}.${platformKey}`;
+}
+
 function getShellSetting(
 	fetchSetting: (key: TerminalShellSetting) => string | string[] | undefined,
 	type: 'automationShell' | 'shell',

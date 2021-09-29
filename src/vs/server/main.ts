@@ -51,7 +51,7 @@ import { ITelemetryServiceConfig, TelemetryService } from 'vs/platform/telemetry
 import { combinedAppender, NullTelemetryService } from 'vs/platform/telemetry/common/telemetryUtils';
 import { AppInsightsAppender } from 'vs/platform/telemetry/node/appInsightsAppender';
 import ErrorTelemetry from 'vs/platform/telemetry/node/errorTelemetry';
-import { IReconnectConstants, LocalReconnectConstants, TerminalSettingId } from 'vs/platform/terminal/common/terminal';
+import { IPtyService, IReconnectConstants, LocalReconnectConstants, TerminalSettingId } from 'vs/platform/terminal/common/terminal';
 import { PtyHostService } from 'vs/platform/terminal/node/ptyHostService';
 import { ExtensionsStorageSyncService, IExtensionsStorageSyncService } from 'vs/platform/userDataSync/common/extensionsStorageSync';
 import { IgnoredExtensionsManagementService, IIgnoredExtensionsManagementService } from 'vs/platform/userDataSync/common/ignoredExtensions';
@@ -82,6 +82,8 @@ import { ExtensionResourceLoaderService } from 'vs/workbench/services/extensionR
 import { ILifecycleService, NullLifecycleService } from 'vs/workbench/services/lifecycle/common/lifecycle';
 import { REMOTE_FILE_SYSTEM_CHANNEL_NAME } from 'vs/workbench/services/remote/common/remoteAgentFileSystemChannel';
 import { RemoteExtensionLogFileName } from 'vs/workbench/services/remote/common/remoteAgentService';
+import { IUriIdentityService } from 'vs/workbench/services/uriIdentity/common/uriIdentity';
+import { UriIdentityService } from 'vs/workbench/services/uriIdentity/common/uriIdentityService';
 
 interface IServerProcessMainStartupOptions {
 	listenWhenReady?: boolean;
@@ -196,6 +198,7 @@ export class ServerProcessMain extends Disposable implements IServerProcessMain 
 
 		// File Service can now be set...
 		services.set(IFileService, fileService);
+		services.set(IUriIdentityService, new SyncDescriptor(UriIdentityService));
 
 		// Configuration
 		await configurationService.initialize();
@@ -208,6 +211,8 @@ export class ServerProcessMain extends Disposable implements IServerProcessMain 
 		const instantiationService = new InstantiationService(services);
 
 		// Telemetry
+		let telemetryService: ITelemetryService;
+
 		if (!environmentServerService.isExtensionDevelopment && !environmentServerService.disableTelemetry && productService.enableTelemetry) {
 			const machineId = await this.resolveMachineId();
 
@@ -222,10 +227,12 @@ export class ServerProcessMain extends Disposable implements IServerProcessMain 
 				sendErrorTelemetry: true,
 			};
 
-			services.set(ITelemetryService, new SyncDescriptor(TelemetryService, [config]));
+			telemetryService = new TelemetryService(config, configurationService);
 		} else {
-			services.set(ITelemetryService, NullTelemetryService);
+			telemetryService = NullTelemetryService;
 		}
+
+		services.set(ITelemetryService, telemetryService);
 
 		// Extensions
 		services.set(IExtensionManagementService, new SyncDescriptor(ExtensionManagementService));
@@ -276,6 +283,17 @@ export class ServerProcessMain extends Disposable implements IServerProcessMain 
 		services.set(IUserDataSyncResourceEnablementService, new SyncDescriptor(UserDataSyncResourceEnablementService));
 		services.set(IUserDataSyncService, new SyncDescriptor(UserDataSyncService));
 
+		// Terminal
+		const reconnectConstants: IReconnectConstants = {
+			graceTime: LocalReconnectConstants.GraceTime,
+			shortGraceTime: LocalReconnectConstants.ShortGraceTime,
+			scrollback: configurationService.getValue<number>(TerminalSettingId.PersistentSessionScrollback) ?? 100,
+			useExperimentalSerialization: configurationService.getValue<boolean>(TerminalSettingId.PersistentSessionExperimentalSerializer) ?? true,
+		};
+
+		const ptyHostService = new PtyHostService(reconnectConstants, configurationService, logService, telemetryService);
+		services.set(IPtyService, this._register(ptyHostService));
+
 		// Channels
 		await this.initChannels(instantiationService, ipcServer);
 
@@ -291,7 +309,8 @@ export class ServerProcessMain extends Disposable implements IServerProcessMain 
 	private initChannels(instantiationService: IInstantiationService, ipcServer: IPCServer<RemoteAgentConnectionContext>): Promise<void> {
 		return new Promise(resolve => {
 			instantiationService.invokeFunction(async accessor => {
-				const configurationService = accessor.get(IConfigurationService);
+				const uriIdentityService = accessor.get(IUriIdentityService);
+				const ptyHostService = accessor.get(IPtyService);
 				const logService = accessor.get(ILogService);
 				const telemetryService = accessor.get(ITelemetryService);
 				const extensionManagementService = accessor.get(IExtensionManagementService);
@@ -309,16 +328,11 @@ export class ServerProcessMain extends Disposable implements IServerProcessMain 
 				ipcServer.registerChannel('request', new RequestChannel(requestService));
 				ipcServer.registerChannel('localizations', <IServerChannel<any>>ProxyChannel.fromService(localizationsService));
 				ipcServer.registerChannel(REMOTE_FILE_SYSTEM_CHANNEL_NAME, new FileProviderChannel(environmentServerService, logService));
-
-				const reconnectConstants: IReconnectConstants = {
-					graceTime: LocalReconnectConstants.GraceTime,
-					shortGraceTime: LocalReconnectConstants.ShortGraceTime,
-					scrollback: configurationService.getValue<number>(TerminalSettingId.PersistentSessionScrollback) ?? 100,
-					useExperimentalSerialization: configurationService.getValue<boolean>(TerminalSettingId.PersistentSessionExperimentalSerializer) ?? true,
-				};
-
-				const ptyHostService = new PtyHostService(reconnectConstants, configurationService, logService, telemetryService);
-				ipcServer.registerChannel(REMOTE_TERMINAL_CHANNEL_NAME, new TerminalProviderChannel(logService, ptyHostService));
+				ipcServer.registerChannel(REMOTE_TERMINAL_CHANNEL_NAME, new TerminalProviderChannel(
+					uriIdentityService,
+					ptyHostService,
+					logService,
+				));
 
 				resolve();
 			});

@@ -3,63 +3,67 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import * as path from 'path';
 import * as platform from 'vs/base/common/platform';
 import { URI } from 'vs/base/common/uri';
-import { transformIncoming } from 'vs/server/uriTransformer';
-import * as terminal from 'vs/workbench/contrib/terminal/common/remoteTerminalChannel';
+import { Workspace } from 'vs/platform/workspace/common/workspace';
 import { AbstractVariableResolverService } from 'vs/workbench/services/configurationResolver/common/variableResolver';
+import { SimpleConfigProvider } from 'vs/workbench/api/common/extHostConfiguration';
 
-// Reference: - ../../workbench/api/common/extHostDebugService.ts
-export class VariableResolverService extends AbstractVariableResolverService {
+/**
+ * @see ExtHostVariableResolverService vs/workbench/api/common/extHostDebugService.ts
+ */export class VariableResolverService extends AbstractVariableResolverService {
 	constructor(
-		remoteAuthority: string,
-		args: terminal.ICreateTerminalProcessArguments,
+		private configProvider: SimpleConfigProvider,
+		workspace: Workspace,
+		activeFileResource: URI | undefined,
 		env: platform.IProcessEnvironment,
 	) {
 		super({
 			getFolderUri: (name: string): URI | undefined => {
-				const folder = args.workspaceFolders.find((f) => f.name === name);
-				return folder && URI.revive(folder.uri);
+				const folder = workspace.folders.find((f) => f.name === name);
+				return folder && folder.uri;
 			},
 			getWorkspaceFolderCount: (): number => {
-				return args.workspaceFolders.length;
+				return workspace.folders.length;
 			},
-			// In ../../workbench/contrib/terminal/common/remoteTerminalChannel.ts it
-			// looks like there are `config:` entries which must be for this? Not sure
-			// how/if the URI comes into play though.
-			getConfigurationValue: (_: URI, section: string): string | undefined => {
-				return args.resolvedVariables[`config:${section}`];
+			getConfigurationValue: (folderUri: URI, section: string): string | undefined => {
+				return this.configProvider.getValue<string>(section, folderUri);
 			},
 			getAppRoot: (): string | undefined => {
-				return (args.resolverEnv && args.resolverEnv['VSCODE_CWD']) || env['VSCODE_CWD'] || process.cwd();
+				return env['VSCODE_CWD'] || process.cwd();
 			},
 			getExecPath: (): string | undefined => {
-				// Assuming that resolverEnv is just for use in the resolver and not for
-				// the terminal itself.
-				return (args.resolverEnv && args.resolverEnv['VSCODE_EXEC_PATH']) || env['VSCODE_EXEC_PATH'];
+				return env['VSCODE_EXEC_PATH'];
 			},
-			// This is just a guess; this is the only file-related thing we're sent
-			// and none of these resolver methods seem to get called so I don't know
-			// how to test.
+			/**
+			 * @see AbstractVariableResolverService#evaluateSingleVariable vs/workbench/services/configurationResolver/common/variableResolver.ts
+			 */
+			getWorkspaceFolderPathForFile: (): string | undefined => {
+				if (activeFileResource) {
+					const folder = workspace.getFolder(activeFileResource);
+
+					if (folder) {
+						return path.normalize(folder.uri.fsPath);
+					}
+				}
+				return undefined;
+			},
 			getFilePath: (): string | undefined => {
-				const resource = transformIncoming(remoteAuthority, args.activeFileResource);
-				if (!resource) {
-					return undefined;
+				if (activeFileResource) {
+					return path.normalize(activeFileResource.fsPath);
 				}
-				// See ../../editor/standalone/browser/simpleServices.ts;
-				// `BaseConfigurationResolverService` calls `getUriLabel` from there.
-				if (resource.scheme === 'file') {
-					return resource.fsPath;
-				}
-				return resource.path;
+				return undefined;
 			},
-			// It looks like these are set here although they aren't on the types:
-			// ../../workbench/contrib/terminal/common/remoteTerminalChannel.ts
+
+			/**
+			 * @file vs/workbench/contrib/terminal/common/remoteTerminalChannel.ts
+			 */
 			getSelectedText: (): string | undefined => {
-				return args.resolvedVariables.selectedText;
+				return this.configProvider.getValue<string>('selectedText');
 			},
 			getLineNumber: (): string | undefined => {
-				return args.resolvedVariables.selectedText;
+				return this.configProvider.getValue<string>('lineNumber');
 			},
 		}, undefined, Promise.resolve(env));
 	}
