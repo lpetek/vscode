@@ -23,7 +23,6 @@ import { realpath } from 'vs/base/node/extpath';
 import { IHostUtils } from 'vs/workbench/api/common/extHostExtensionService';
 import { RunOnceScheduler } from 'vs/base/common/async';
 import { boolean } from 'vs/editor/common/config/editorOptions';
-import { monkeyPatchProxyProtocols } from 'vs/base/node/proxyAgent';
 
 import 'vs/workbench/api/common/extHost.common.services';
 import 'vs/workbench/api/node/extHost.node.services';
@@ -330,9 +329,6 @@ function connectToRenderer(protocol: IMessagePassingProtocol): Promise<IRenderer
 }
 
 export async function startExtensionHostProcess(): Promise<void> {
-	/** @coder */
-	monkeyPatchProxyProtocols();
-
 	performance.mark(`code/extHost/willConnectToRenderer`);
 	const protocol = await createExtHostProtocol();
 	performance.mark(`code/extHost/didConnectToRenderer`);

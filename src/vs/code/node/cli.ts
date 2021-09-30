@@ -14,7 +14,6 @@ import { isString } from 'vs/base/common/types';
 import { enableCustomMarketplace } from 'vs/base/node/marketplace';
 import { whenDeleted, writeFileSync } from 'vs/base/node/pfs';
 import { findFreePort } from 'vs/base/node/ports';
-import { monkeyPatchProxyProtocols } from 'vs/base/node/proxyAgent';
 import { NativeParsedArgs } from 'vs/platform/environment/common/argv';
 import { buildHelpMessage, buildVersionMessage, OPTIONS } from 'vs/platform/environment/node/argv';
 import { addArg, parseCLIProcessArgv } from 'vs/platform/environment/node/argvHelper';
@@ -38,7 +37,6 @@ interface IMainCli {
 export async function main(argv: string[]): Promise<any> {
 	/** @coder */
 	enableCustomMarketplace(product);
-	monkeyPatchProxyProtocols();
 
 	let args: NativeParsedArgs;
 
