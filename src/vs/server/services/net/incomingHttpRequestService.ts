@@ -3,13 +3,11 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { randomBytes } from 'crypto';
 import { createReadStream, promises as fs, readFileSync } from 'fs';
 import { IncomingMessage, Server, ServerResponse } from 'http';
 import { join, normalize } from 'path';
-import { match, MatchFunction, MatchResult } from 'path-to-regexp';
+import { match, MatchFunction } from 'path-to-regexp';
 import { getMediaOrTextMime, PLAIN_TEXT_MIME_TYPE } from 'vs/base/common/mime';
-import { UriComponents } from 'vs/base/common/uri';
 import { ProtocolConstants } from 'vs/base/parts/ipc/common/ipc.net';
 import { refineServiceDecorator } from 'vs/platform/instantiation/common/instantiation';
 import { ILogService } from 'vs/platform/log/common/log';
@@ -18,134 +16,8 @@ import { AbstractIncomingRequestService, IAbstractIncomingRequestService, Parsed
 import { IEnvironmentServerService } from 'vs/server/services/environmentService';
 import { IServerThemeService } from 'vs/server/services/themeService';
 import * as Handlebars from 'handlebars';
-import { IWorkbenchConfigurationSerialized } from 'vs/platform/workspaces/common/workbench';
 import { FileSystemError } from 'vs/workbench/api/common/extHostTypes';
-
-const APP_ROOT = join(__dirname, '..', '..', '..', '..');
-const WORKBENCH_PATH = join(APP_ROOT, 'src', 'vs', 'code', 'browser', 'workbench');
-
-const paths = {
-	WEBVIEW: join(APP_ROOT, 'out/vs/workbench/contrib/webview/browser/pre'),
-	FAVICON: join(APP_ROOT, 'resources', 'web', 'favicon.ico'),
-};
-
-/** Matching the given keys in `PollingURLCallbackProvider.QUERY_KEYS` */
-const wellKnownKeys = [
-	'vscode-requestId',
-	'vscode-scheme',
-	'vscode-authority',
-	'vscode-path',
-	'vscode-query',
-	'vscode-fragment',
-] as const;
-
-type PollingURLQueryKeys = typeof wellKnownKeys[number];
-
-/**
- * See [Web app manifest on MDN](https://developer.mozilla.org/en-US/docs/Web/Manifest) for additional information.
- */
-export interface WebManifest {
-	name: string;
-	short_name: string;
-	start_url: string;
-	display: string;
-	'background-color': string;
-	description: string;
-	icons: Array<{ src: string; type: string; sizes: string }>;
-}
-
-/**
- * A callback response matching the expected value in `PollingURLCallbackProvider`
- */
-interface Callback {
-	uri: Partial<UriComponents>;
-	/** This should be no longer than `PollingURLCallbackProvider.FETCH_TIMEOUT` */
-	timeout: NodeJS.Timeout;
-}
-
-/**
- * A function which may respond to a request with an possible set of URL params.
- */
-export type WebRequestListener<T extends object | null = null> = T extends object
-	? (req: ParsedRequest, res: ServerResponse, params: MatchResult<T>['params']) => void | Promise<void>
-	: (req: ParsedRequest, res: ServerResponse) => void | Promise<void>;
-
-const matcherOptions = { encode: encodeURI, decode: decodeURIComponent };
-
-/**
- * A nonce used to mark specific inline scripts as secure.
- * @example To use, apply the following attribute:
- * ```html
- * <script nonce="{{CSP_NONCE}}">...</script>
- * ```
- */
-const CSP_NONCE = randomBytes(16).toString('base64');
-
-/**
- * Content security policies derived from existing inline Workbench CSPs.
- */
-const contentSecurityPolicies: Record<string, string> = {
-	'default-src': `'nonce-${CSP_NONCE}'`,
-	'manifest-src': `'self'`,
-	'img-src': `'self' https: data: blob: vscode-remote-resource:`,
-	'media-src': `'none'`,
-	'frame-src': `'self' vscode-webview:`,
-	'object-src': `'self'`,
-	'script-src': `'self' 'nonce-${CSP_NONCE}' 'unsafe-eval' blob:`,
-	'style-src': `'self' 'unsafe-inline'`,
-	'connect-src': `'self' https: ws:`,
-	'font-src': `'self' https: vscode-remote-resource:`,
-
-	'require-trusted-types-for': `'script'`,
-	'trusted-types': [
-		'TrustedFunctionWorkaround',
-		'ExtensionScripts',
-		'amdLoader',
-		'cellRendererEditorText',
-		'defaultWorkerFactory',
-		'diffEditorWidget',
-		'editorGhostText',
-		'domLineBreaksComputer',
-		'editorViewLayer',
-		'diffReview',
-		'extensionHostWorker',
-		'insane',
-		'notebookRenderer',
-		'safeInnerHtml',
-		'standaloneColorizer',
-		'tokenizeToString',
-		'webNestedWorkerExtensionHost'
-	].join(' ')
-};
-
-function compileTemplate<T = any>(templatePath: string) {
-	return Handlebars.compile<T>(readFileSync(templatePath).toString());
-}
-
-interface BaseWorkbenchTemplate {
-	CLIENT_BACKGROUND_COLOR: string;
-	CLIENT_FOREGROUND_COLOR: string;
-	CSP_NONCE: string;
-}
-
-interface WorkbenchTemplate extends BaseWorkbenchTemplate {
-	WORKBENCH_WEB_CONFIGURATION: IWorkbenchConfigurationSerialized;
-	WORKBENCH_BUILTIN_EXTENSIONS: Array<never>;
-	CLIENT_BACKGROUND_COLOR: string;
-	CLIENT_FOREGROUND_COLOR: string;
-}
-
-interface WorkbenchErrorTemplate extends BaseWorkbenchTemplate {
-	ERROR_HEADER: string;
-	ERROR_CODE: string;
-	ERROR_MESSAGE: string;
-	ERROR_FOOTER: string;
-}
-
-interface ClientTheme {
-	backgroundColor: string;
-	foregroundColor: string;
-}
+import { WebRequestListener, Callback, compileTemplate, WorkbenchErrorTemplate, WORKBENCH_PATH, WorkbenchTemplate, APP_ROOT, contentSecurityPolicies, WebManifest, AssetPaths, PollingURLQueryKeys, ClientTheme, matcherOptions, CSP_NONCE, wellKnownKeys, SERVICE_WORKER_FILE_NAME } from 'vs/server/services/net/common/http';
 
 interface RequestHandlerOptions {
 	/**
@@ -241,20 +113,29 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 			display: 'fullscreen',
 			'background-color': clientTheme.backgroundColor,
 			description: 'Run editors on a remote server.',
-			// icons: productConfiguration.icons || [],
-			icons: [],
+			icons: productConfiguration.icons || [],
 		};
 
 		res.writeHead(200, { 'Content-Type': 'application/manifest+json' });
 
-		return res.end(JSON.stringify(webManifest));
+		return res.end(JSON.stringify(webManifest, null, 2));
+	};
+
+	/**
+	 * Service Worker endpoint.
+	 * @remark this is separated to satisfy the browser's relative scope requirements.
+	 */
+	private $serviceWorker: WebRequestListener = async (req, res) => {
+		return this.serveFile(AssetPaths.ServiceWorker, req, res, {
+			'Service-Worker-Allowed': req.pathPrefix,
+		});
 	};
 
 	/**
 	 * Static files endpoint.
 	 */
 	private $static: WebRequestListener<string[]> = async (req, res, params) => {
-		return this.serveFile(join(APP_ROOT, params[0]), req, res,);
+		return this.serveFile(join(APP_ROOT, params[0]), req, res);
 	};
 
 	/**
@@ -385,15 +266,13 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 	 * Webview endpoint
 	 */
 	private $webview: WebRequestListener<string[]> = async (req, res, params) => {
-		return this.serveFile(join(paths.WEBVIEW, params[0]), req, res);
+		return this.serveFile(join(AssetPaths.Webview, params[0]), req, res);
 	};
 
 	/**
 	 * @TODO Consider replacing with FileService.
 	 */
-	serveFile = async (filePath: string, req: IncomingMessage, res: ServerResponse): Promise<void> => {
-		const responseHeaders = Object.create(null);
-
+	serveFile = async (filePath: string, req: IncomingMessage, res: ServerResponse, responseHeaders = Object.create(null)): Promise<void> => {
 		try {
 			// Sanity checks
 			filePath = normalize(filePath); // ensure no "." and ".."
@@ -496,10 +375,11 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 
 		const routePairs: readonly RoutePair[] = [
 			['/manifest.webmanifest', this.$webManifest],
+			[`/${SERVICE_WORKER_FILE_NAME}`, this.$serviceWorker],
 			// Legacy browsers.
 			['/manifest.json', this.$webManifest],
-			['/favicon.ico', this.serveFile.bind(this, paths.FAVICON)],
-			['/static/(.*)', this.$static],
+			['/favicon.ico', this.serveFile.bind(this, AssetPaths.Favicon)],
+			[`${AssetPaths.StaticBase}/(.*)`, this.$static],
 			['/webview/(.*)', this.$webview],
 			['/', this.$root],
 			['/.json', this.$webConfig],

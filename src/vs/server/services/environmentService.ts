@@ -18,6 +18,7 @@ import { getLogLevel } from 'vs/platform/log/common/log';
 import { IProductService } from 'vs/platform/product/common/productService';
 import { toWorkspaceFolder } from 'vs/platform/workspace/common/workspace';
 import { IWebWorkspace, IWorkbenchConfigurationSerialized } from 'vs/platform/workspaces/common/workbench';
+import { AssetPaths, SERVICE_WORKER_FILE_NAME } from 'vs/server/services/net/common/http';
 import { getCachedNlsConfiguration, getLocaleFromConfig } from 'vs/workbench/services/extensions/node/nls';
 import { RemoteExtensionLogFileName } from 'vs/workbench/services/remote/common/remoteAgentService';
 import { ParsedRequest } from './net/abstractIncomingRequestService';
@@ -87,18 +88,23 @@ export class EnvironmentServerService extends NativeEnvironmentService implement
 		const productConfiguration: Writeable<IProductConfiguration> = {
 			...productService,
 
+			serviceWorker: {
+				scope: req.pathPrefix,
+				url: this.createRequestUrl(req, SERVICE_WORKER_FILE_NAME).toString(),
+			},
+
 			// Endpoints
 			logoutEndpointUrl: logoutEndpointUrl.toString(),
-			webEndpointUrl: this.createRequestUrl(req, '/static').toString(),
-			webEndpointUrlTemplate: this.createRequestUrl(req, '/static').toString(),
+			webEndpointUrl: this.createRequestUrl(req, AssetPaths.StaticBase).toString(),
+			webEndpointUrlTemplate: this.createRequestUrl(req, AssetPaths.StaticBase).toString(),
 			icons: [
 				{
-					src: this.createRequestUrl(req, '/static/src/browser/media/pwa-icon-192.png').toString(),
+					src: this.createRequestUrl(req, '/static/resources/web/pwa-icon-192.png').toString(),
 					type: 'image/png',
 					sizes: '192x192',
 				},
 				{
-					src: this.createRequestUrl(req, '/static/src/browser/media/pwa-icon-512.png').toString(),
+					src: this.createRequestUrl(req, '/static/resources/web/pwa-icon-512.png').toString(),
 					type: 'image/png',
 					sizes: '512x512',
 				},

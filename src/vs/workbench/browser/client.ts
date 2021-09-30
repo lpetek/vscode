@@ -32,6 +32,17 @@ export class CodeServerClientAdditions extends Disposable {
 	static AUTH_KEY = 'code-server.authed';
 	productConfiguration: Partial<IProductConfiguration>;
 
+	private ServiceWorkerScripts = self.trustedTypes?.createPolicy('ServiceWorkerScripts', {
+		createScriptURL: source => {
+			if (this.productConfiguration.serviceWorker?.url === source) {
+				return source;
+			}
+
+			throw new Error('Service Worker URL does not align with given product configuration');
+		}
+	});
+
+
 	constructor(
 		productConfiguration: Partial<IProductConfiguration>,
 		@ILogService private logService: ILogService,
@@ -45,6 +56,8 @@ export class CodeServerClientAdditions extends Disposable {
 
 	async startup(): Promise<void> {
 		const { nameShort, updateUrl } = this.productConfiguration;
+
+		await this.registerServiceWorker();
 
 		// Emit client events
 		const event = new CustomEvent('ide-ready');
@@ -190,4 +203,33 @@ export class CodeServerClientAdditions extends Disposable {
 			when: ContextKeyExpr.has(CodeServerClientAdditions.AUTH_KEY),
 		});
 	}
+
+	private registerServiceWorker = async (): Promise<void> => {
+		const { serviceWorker } = this.productConfiguration;
+
+		if (!serviceWorker) {
+			this.logService.debug('Product configuration does not include service worker. Skipping registration...');
+			return;
+		}
+		if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+			this.logService.debug('Browser does not support service workers. Skipping registration...');
+			return;
+		}
+
+		const trustedUrl = this.ServiceWorkerScripts?.createScriptURL(serviceWorker.url);
+
+		if (!trustedUrl) {
+			throw new Error('Service Worker URL could not be verified');
+		}
+
+		try {
+			await navigator.serviceWorker.register(trustedUrl as unknown as string, {
+				scope: serviceWorker.scope,
+			});
+
+			this.logService.info('[Service Worker] registered');
+		} catch (error: any) {
+			this.logService.error('[Service Worker] registration', error as Error);
+		}
+	};
 }

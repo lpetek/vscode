@@ -5,6 +5,7 @@
 
 import * as http from 'http';
 import * as net from 'net';
+import * as path from 'path';
 import { Disposable } from 'vs/base/common/lifecycle';
 import { createDecorator } from 'vs/platform/instantiation/common/instantiation';
 import { ILogService } from 'vs/platform/log/common/log';
@@ -39,7 +40,7 @@ export abstract class AbstractIncomingRequestService<E extends NetEventListener>
 
 		Object.assign(req, {
 			parsedUrl,
-			pathPrefix: parsedUrl.pathname,
+			pathPrefix: path.join(path.dirname(parsedUrl.pathname), '/'),
 		});
 
 		this.eventListener(req as ParsedRequest, ...args);

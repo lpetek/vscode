@@ -24,7 +24,8 @@
 		"vs/workbench/api/worker/extHostExtensionService.ts",
 		"vs/workbench/contrib/notebook/browser/view/renderers/cellRenderer.ts",
 		"vs/workbench/contrib/notebook/browser/view/renderers/webviewPreloads.ts",
-		"vs/workbench/services/extensions/browser/webWorkerExtensionHost.ts"
+		"vs/workbench/services/extensions/browser/webWorkerExtensionHost.ts",
+		"vs/workbench/browser/client.ts"
 	],
 	"ban-worker-calls": [
 		"vs/base/worker/defaultWorkerFactory.ts",
