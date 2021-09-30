@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as ProxyAgent from 'proxy-agent';
-import * as proxyFromEnv from 'proxy-from-env';
+import { getProxyForUrl } from 'proxy-from-env';
 
 /**
  * This file has nothing to do with the code-server proxy.
@@ -58,7 +58,7 @@ export function shouldEnableProxy(): boolean {
 	const testedProxyEndpoints = sampleUrls.map(url => {
 		return {
 			url,
-			proxyUrl: proxyFromEnv.getProxyForUrl(url.toString())
+			proxyUrl: getProxyForUrl(url.toString())
 		};
 	});
 
