@@ -30,11 +30,15 @@
 	<script src="./static/out/vs/loader.js"></script>
 	<script src="./static/out/vs/webPackagePaths.js"></script>
 	<script nonce="{{CSP_NONCE}}">
+		const baseUrl = new URL(window.location.href);
+		baseUrl.search = '';
+		baseUrl.hash = '';
+
 		Object.keys(self.webPackagePaths).map(function (key, index) {
-			self.webPackagePaths[key] = `${window.location.href}static/node_modules/${key}/${self.webPackagePaths[key]}`;
+			self.webPackagePaths[key] = `${baseUrl.href}static/node_modules/${key}/${self.webPackagePaths[key]}`;
 		});
 		require.config({
-			baseUrl: `${window.location.href}static/out`,
+			baseUrl: `${baseUrl.href}static/out`,
 			cspNonce: '{{CSP_NONCE}}',
 			recordStats: true,
 			trustedTypesPolicy: window.trustedTypes?.createPolicy('amdLoader', {
