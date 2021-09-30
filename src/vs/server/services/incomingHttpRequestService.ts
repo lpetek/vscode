@@ -26,7 +26,7 @@ const WORKBENCH_PATH = join(APP_ROOT, 'src', 'vs', 'code', 'browser', 'workbench
 
 const paths = {
 	WEBVIEW: join(APP_ROOT, 'out/vs/workbench/contrib/webview/browser/pre'),
-	FAVICON: join(APP_ROOT, 'resources', 'win32', 'code.ico'),
+	FAVICON: join(APP_ROOT, 'resources', 'web', 'favicon.ico'),
 };
 
 /** Matching the given keys in `PollingURLCallbackProvider.QUERY_KEYS` */

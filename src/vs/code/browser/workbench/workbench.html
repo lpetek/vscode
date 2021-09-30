@@ -14,10 +14,15 @@
 		<meta id="vscode-workbench-auth-session" data-settings="{{{WORKBENCH_AUTH_SESSION}}}">
 
 		<!-- Workbench Icon/Manifest/CSS -->
-		<link rel="icon" href="./favicon.ico" type="image/x-icon" />
+		<link data-name="vs/workbench/workbench.web.api" rel="stylesheet" href="./static/out/vs/workbench/workbench.web.api.css">
+		<link rel="icon" href="./static/resources/web/favicon-dark-support.svg" type="image/x-icon" />
+		<link rel="alternate icon" href="./static/resources/web/favicon.ico" type="image/x-icon" />
+		<link rel="apple-touch-icon" sizes="192x192" href="./static/resources/web/pwa-icon-192.png" />
+		<link rel="apple-touch-icon" sizes="512x512" href="./static/resources/web/pwa-icon-512.png" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+
 		<link rel="manifest" href="./manifest.json" crossorigin="use-credentials">
 		<meta name="theme-color" content="{{CLIENT_BACKGROUND_COLOR}}">
-		<link data-name="vs/workbench/workbench.web.api" rel="stylesheet" href="./static/out/vs/workbench/workbench.web.api.css">
 
 		<!-- Workbench Configuration -->
 		<script id="vscode-workbench-web-configuration" type="application/json">{{{toJSON WORKBENCH_WEB_CONFIGURATION}}}</script>
@@ -27,8 +32,8 @@
 	</body>
 
 	<!-- Startup (do not modify order of script tags!) -->
-	<script src="./static/out/vs/loader.js"></script>
-	<script src="./static/out/vs/webPackagePaths.js"></script>
+	<script data-cfasync="false" src="./static/out/vs/loader.js"></script>
+	<script data-cfasync="false" src="./static/out/vs/webPackagePaths.js"></script>
 	<script nonce="{{CSP_NONCE}}">
 		const baseUrl = new URL(window.location.href);
 		baseUrl.search = '';
@@ -52,7 +57,7 @@
 	<script nonce="{{CSP_NONCE}}">
 		performance.mark('code/willLoadWorkbenchMain');
 	</script>
-	<script src="./static/out/vs/workbench/workbench.web.api.nls.js"></script>
-	<script src="./static/out/vs/workbench/workbench.web.api.js"></script>
-	<script src="./static/out/vs/code/browser/workbench/workbench.js"></script>
+	<script data-cfasync="false" src="./static/out/vs/workbench/workbench.web.api.nls.js"></script>
+	<script data-cfasync="false" src="./static/out/vs/workbench/workbench.web.api.js"></script>
+	<script data-cfasync="false" src="./static/out/vs/code/browser/workbench/workbench.js"></script>
 </html>
