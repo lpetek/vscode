@@ -69,10 +69,10 @@ import { ExtensionEnvironmentChannel } from 'vs/server/ipc/extensionEnvironmentI
 import { FileProviderChannel } from 'vs/server/ipc/fileProviderIpc';
 import { TerminalProviderChannel } from 'vs/server/ipc/terminalProviderIpc';
 import { EnvironmentServerService, IEnvironmentServerService } from 'vs/server/services/environmentService';
-import { IIncomingHTTPRequestService, IncomingHTTPRequestService } from 'vs/server/services/incomingHttpRequestService';
+import { IIncomingHTTPRequestService, IncomingHTTPRequestService } from 'vs/server/services/net/incomingHttpRequestService';
 import { INLSExtensionScannerService, NLSExtensionScannerService } from 'vs/server/services/nlsExtensionScannerService';
 import { IServerThemeService, ServerThemeService } from 'vs/server/services/themeService';
-import { IWebSocketServerService, WebSocketServerService } from 'vs/server/services/webSocketServerService';
+import { IWebSocketServerService, WebSocketServerService } from 'vs/server/services/net/webSocketServerService';
 import { createServerURITransformer } from 'vs/server/uriTransformer';
 import { REMOTE_TERMINAL_CHANNEL_NAME } from 'vs/workbench/contrib/terminal/common/remoteTerminalChannel';
 import { IExtensionResourceLoaderService } from 'vs/workbench/services/extensionResourceLoader/common/extensionResourceLoader';

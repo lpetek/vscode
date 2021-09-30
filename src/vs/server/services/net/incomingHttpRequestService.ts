@@ -14,7 +14,7 @@ import { ProtocolConstants } from 'vs/base/parts/ipc/common/ipc.net';
 import { refineServiceDecorator } from 'vs/platform/instantiation/common/instantiation';
 import { ILogService } from 'vs/platform/log/common/log';
 import { editorBackground, editorForeground } from 'vs/platform/theme/common/colorRegistry';
-import { AbstractIncomingRequestService, IAbstractIncomingRequestService, ParsedRequest } from 'vs/server/services/abstractIncomingRequestService';
+import { AbstractIncomingRequestService, IAbstractIncomingRequestService, ParsedRequest } from 'vs/server/services/net/abstractIncomingRequestService';
 import { IEnvironmentServerService } from 'vs/server/services/environmentService';
 import { IServerThemeService } from 'vs/server/services/themeService';
 import * as Handlebars from 'handlebars';

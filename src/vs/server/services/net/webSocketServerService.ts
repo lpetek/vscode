@@ -18,7 +18,7 @@ import { ConnectionOptions, parseQueryConnectionOptions } from 'vs/server/connec
 import { ExtensionHostConnection } from 'vs/server/connection/extensionHostConnection';
 import { ManagementConnection } from 'vs/server/connection/managementConnection';
 import { ServerProtocol } from 'vs/server/protocol';
-import { AbstractIncomingRequestService, IAbstractIncomingRequestService, ParsedRequest } from 'vs/server/services/abstractIncomingRequestService';
+import { AbstractIncomingRequestService, IAbstractIncomingRequestService, ParsedRequest } from 'vs/server/services/net/abstractIncomingRequestService';
 import { IEnvironmentServerService } from 'vs/server/services/environmentService';
 
 type Connection = ExtensionHostConnection | ManagementConnection;

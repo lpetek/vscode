@@ -20,7 +20,7 @@ import { toWorkspaceFolder } from 'vs/platform/workspace/common/workspace';
 import { IWebWorkspace, IWorkbenchConfigurationSerialized } from 'vs/platform/workspaces/common/workbench';
 import { getCachedNlsConfiguration, getLocaleFromConfig } from 'vs/workbench/services/extensions/node/nls';
 import { RemoteExtensionLogFileName } from 'vs/workbench/services/remote/common/remoteAgentService';
-import { ParsedRequest } from './abstractIncomingRequestService';
+import { ParsedRequest } from './net/abstractIncomingRequestService';
 
 export interface IEnvironmentServerService extends INativeEnvironmentService {
 	readonly serverUrl: URL;
