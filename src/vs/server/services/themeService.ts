@@ -9,7 +9,7 @@ import { ILogService } from 'vs/platform/log/common/log';
 import { ColorScheme } from 'vs/platform/theme/common/theme';
 import { INLSExtensionScannerService } from 'vs/server/services/nlsExtensionScannerService';
 import { IExtensionResourceLoaderService } from 'vs/workbench/services/extensionResourceLoader/common/extensionResourceLoader';
-import { ExtensionMessageCollector, IExtensionPointUser } from 'vs/workbench/services/extensions/common/extensionsRegistry';
+import { ExtensionMessageCollector, IExtensionPoint, IExtensionPointUser } from 'vs/workbench/services/extensions/common/extensionsRegistry';
 import { ColorThemeData } from 'vs/workbench/services/themes/common/colorThemeData';
 import { ThemeConfiguration } from 'vs/workbench/services/themes/common/themeConfiguration';
 import { registerColorThemeExtensionPoint, ThemeRegistry } from 'vs/workbench/services/themes/common/themeExtensionPoints';
@@ -21,15 +21,28 @@ export interface IServerThemeService {
 }
 
 export const IServerThemeService = createDecorator<IServerThemeService>('IServerThemeService');
+let colorThemesExtPoint: IExtensionPoint<IThemeExtensionPoint[]>;
+let colorThemeRegistry: ThemeRegistry<ColorThemeData>;
+
+/** Wrapped to avoid Jest instance issues. */
+try {
+	colorThemesExtPoint = registerColorThemeExtensionPoint();
+	colorThemeRegistry = new ThemeRegistry(colorThemesExtPoint, ColorThemeData.fromExtensionTheme);
+} catch (error) {
+	if (error instanceof Error && error.message.includes('Handler already set')) {
+		// Disregard
+	}
+	throw error;
+}
+
+const extPointName = colorThemesExtPoint.name;
 
 /**
  * The server theme service allows for limited and readonly access to theme resources.
  * @remark This is not yet as robust as `WorkbenchThemeService`
  */
 export class ServerThemeService implements IServerThemeService {
-	private colorThemesExtPoint = registerColorThemeExtensionPoint();
 	private themeConfiguration = new ThemeConfiguration(this.configurationService);
-	private colorThemeRegistry = new ThemeRegistry(this.colorThemesExtPoint, ColorThemeData.fromExtensionTheme);
 
 	constructor(
 		@INLSExtensionScannerService private extensionScannerService: INLSExtensionScannerService,
@@ -39,7 +52,6 @@ export class ServerThemeService implements IServerThemeService {
 	) { }
 
 	async initialize() {
-		const extPointName = this.colorThemesExtPoint.name;
 		const availableExtensions = await this.extensionScannerService.scanExtensions();
 
 		const users: IExtensionPointUser<IThemeExtensionPoint[]>[] = availableExtensions
@@ -56,7 +68,7 @@ export class ServerThemeService implements IServerThemeService {
 				};
 			});
 
-		this.colorThemesExtPoint.acceptUsers(users);
+		colorThemesExtPoint.acceptUsers(users);
 	}
 
 	/**
@@ -67,7 +79,7 @@ export class ServerThemeService implements IServerThemeService {
 		const currentThemeId = this.themeConfiguration.colorTheme;
 
 		this.logService.debug(`Attempting to find user's active theme:`, currentThemeId);
-		let theme = this.colorThemeRegistry.findThemeBySettingsId(currentThemeId);
+		let theme = colorThemeRegistry.findThemeBySettingsId(currentThemeId);
 
 		if (!theme) {
 			this.logService.debug(`User's active theme not found the registry. Was it mispelled or uninstalled?`);
