@@ -7,7 +7,6 @@ import * as fs from 'fs';
 import { gracefulify } from 'graceful-fs';
 import { createServer as createNetServer, Server as NetServer } from 'http';
 import { hostname, release } from 'os';
-import * as path from 'path';
 import { toErrorMessage } from 'vs/base/common/errorMessage';
 import { setUnexpectedErrorHandler } from 'vs/base/common/errors';
 import { combinedDisposable, Disposable } from 'vs/base/common/lifecycle';
@@ -34,7 +33,7 @@ import { ServiceCollection } from 'vs/platform/instantiation/common/serviceColle
 import { ILocalizationsService } from 'vs/platform/localizations/common/localizations';
 import { LocalizationsService } from 'vs/platform/localizations/node/localizations';
 import { BufferLogService } from 'vs/platform/log/common/bufferLog';
-import { ConsoleMainLogger, getLogLevel, ILoggerService, ILogService, MultiplexLogService } from 'vs/platform/log/common/log';
+import { ConsoleMainLogger, getLogLevel, ILogger, ILoggerService, ILogService, MultiplexLogService } from 'vs/platform/log/common/log';
 import { LogLevelChannel } from 'vs/platform/log/common/logIpc';
 import { LoggerService } from 'vs/platform/log/node/loggerService';
 import { SpdLogLogger } from 'vs/platform/log/node/spdlogLog';
@@ -81,7 +80,6 @@ import { IExtensionResourceLoaderService } from 'vs/workbench/services/extension
 import { ExtensionResourceLoaderService } from 'vs/workbench/services/extensionResourceLoader/electron-sandbox/extensionResourceLoaderService';
 import { ILifecycleService, NullLifecycleService } from 'vs/workbench/services/lifecycle/common/lifecycle';
 import { REMOTE_FILE_SYSTEM_CHANNEL_NAME } from 'vs/workbench/services/remote/common/remoteAgentFileSystemChannel';
-import { RemoteExtensionLogFileName } from 'vs/workbench/services/remote/common/remoteAgentService';
 import { IUriIdentityService } from 'vs/workbench/services/uriIdentity/common/uriIdentity';
 import { UriIdentityService } from 'vs/workbench/services/uriIdentity/common/uriIdentityService';
 
@@ -91,6 +89,12 @@ interface IServerProcessMainStartupOptions {
 
 interface IServerProcessMain {
 	startup(startupOptions: IServerProcessMainStartupOptions): Promise<NetServer>;
+}
+
+interface ServicesResult {
+	instantiationService: IInstantiationService;
+	logService: ILogService;
+	initializeSpdLogger: () => ILogger
 }
 
 /**
@@ -116,6 +120,7 @@ export class ServerProcessMain extends Disposable implements IServerProcessMain 
 		// Services
 		const {
 			instantiationService,
+			initializeSpdLogger,
 			logService,
 		} = await this.createServices();
 
@@ -131,6 +136,8 @@ export class ServerProcessMain extends Disposable implements IServerProcessMain 
 			instantiationService.invokeFunction(accessor => new ErrorTelemetry(accessor.get(ITelemetryService)))
 ,		));
 
+		initializeSpdLogger();
+
 		// Listen for incoming connections
 		if (listenWhenReady) {
 			const { serverUrl } = this.configuration;
@@ -145,7 +152,7 @@ export class ServerProcessMain extends Disposable implements IServerProcessMain 
 	// References:
 	// ../../electron-browser/sharedProcess/sharedProcessMain.ts#L148
 	// ../../../code/electron-main/app.ts
-	public async createServices(): Promise<{ instantiationService: IInstantiationService, logService: ILogService }> {
+	public async createServices(): Promise<ServicesResult> {
 		const services = new ServiceCollection();
 
 		// Product
@@ -297,11 +304,20 @@ export class ServerProcessMain extends Disposable implements IServerProcessMain 
 		// Channels
 		await this.initChannels(instantiationService, ipcServer);
 
-		// Delay creation of spdlog for perf reasons (https://github.com/microsoft/vscode/issues/72906)
-		bufferLogService.logger = new SpdLogLogger('main', path.join(environmentServerService.logsPath, `${RemoteExtensionLogFileName}.log`), true, bufferLogService.getLevel());
-
 		return {
 			instantiationService,
+			// Delay creation of spdlog for perf reasons (https://github.com/microsoft/vscode/issues/72906)
+			initializeSpdLogger: () => {
+				logService.debug('Initializing Spd logger...');
+				bufferLogService.logger = new SpdLogLogger(
+					'main',
+					environmentServerService.remoteExtensionLogsPath,
+					true,
+					bufferLogService.getLevel()
+				);
+
+				return bufferLogService.logger;
+			},
 			logService,
 		};
 	}

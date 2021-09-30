@@ -19,6 +19,7 @@ import { IProductService } from 'vs/platform/product/common/productService';
 import { toWorkspaceFolder } from 'vs/platform/workspace/common/workspace';
 import { IWebWorkspace, IWorkbenchConfigurationSerialized } from 'vs/platform/workspaces/common/workbench';
 import { getCachedNlsConfiguration, getLocaleFromConfig } from 'vs/workbench/services/extensions/node/nls';
+import { RemoteExtensionLogFileName } from 'vs/workbench/services/remote/common/remoteAgentService';
 import { ParsedRequest } from './abstractIncomingRequestService';
 
 export interface IEnvironmentServerService extends INativeEnvironmentService {
@@ -27,6 +28,7 @@ export interface IEnvironmentServerService extends INativeEnvironmentService {
 	readonly applicationName: string;
 	readonly commit: string;
 	readonly version: string;
+	readonly remoteExtensionLogsPath: string;
 	createWorkbenchWebConfiguration: (req: ParsedRequest) => Promise<IWorkbenchConfigurationSerialized>;
 	nlsConfigurationPromise: Promise<NLSConfiguration>
 }
@@ -232,6 +234,11 @@ export class EnvironmentServerService extends NativeEnvironmentService implement
 	@memoize
 	public get environmentPaths(): string[] {
 		return [this.extensionsPath, this.logsPath, this.globalStorageHome.fsPath, this.workspaceStorageHome.fsPath, ...this.extraExtensionPaths, ...this.extraBuiltinExtensionPaths];
+	}
+
+	@memoize
+	public get remoteExtensionLogsPath() {
+		return path.join(this.logsPath, `${RemoteExtensionLogFileName}.log`);
 	}
 
 	@memoize
