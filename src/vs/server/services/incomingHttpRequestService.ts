@@ -19,6 +19,7 @@ import { IEnvironmentServerService } from 'vs/server/services/environmentService
 import { IServerThemeService } from 'vs/server/services/themeService';
 import * as Handlebars from 'handlebars';
 import { IWorkbenchConfigurationSerialized } from 'vs/platform/workspaces/common/workbench';
+import { FileSystemError } from 'vs/workbench/api/common/extHostTypes';
 
 const APP_ROOT = join(__dirname, '..', '..', '..', '..');
 const WORKBENCH_PATH = join(APP_ROOT, 'src', 'vs', 'code', 'browser', 'workbench');
@@ -117,12 +118,15 @@ const contentSecurityPolicies: Record<string, string> = {
 	].join(' ')
 };
 
+function compileTemplate<T = any>(templatePath: string) {
+	return Handlebars.compile<T>(readFileSync(templatePath).toString());
+}
+
 interface BaseWorkbenchTemplate {
 	CLIENT_BACKGROUND_COLOR: string;
 	CLIENT_FOREGROUND_COLOR: string;
 	CSP_NONCE: string;
 }
-
 
 interface WorkbenchTemplate extends BaseWorkbenchTemplate {
 	WORKBENCH_WEB_CONFIGURATION: IWorkbenchConfigurationSerialized;
@@ -143,6 +147,14 @@ interface ClientTheme {
 	foregroundColor: string;
 }
 
+interface RequestHandlerOptions {
+	/**
+	 * Disables the 404 route handler.
+	 * @remark This is especially useful when a parent server is delegating requests.
+	 */
+	disableFallbackRoute?: boolean
+}
+
 export interface IIncomingHTTPRequestService extends IAbstractIncomingRequestService {
 	listen(): void;
 }
@@ -156,9 +168,9 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 	private callbackUriToRequestId = new Map<string, Callback>();
 
 	private templates = {
-		workbenchError: Handlebars.compile<WorkbenchErrorTemplate>(readFileSync(join(WORKBENCH_PATH, 'workbench-error.html')).toString()),
-		workbenchDev: Handlebars.compile<WorkbenchTemplate>(readFileSync(join(WORKBENCH_PATH, 'workbench-dev.html')).toString()),
-		workbenchProd: Handlebars.compile<WorkbenchTemplate>(readFileSync(join(WORKBENCH_PATH, 'workbench.html')).toString()),
+		workbenchError: compileTemplate<WorkbenchErrorTemplate>(join(WORKBENCH_PATH, 'workbench-error.html')),
+		workbenchDev: compileTemplate<WorkbenchTemplate>(join(WORKBENCH_PATH, 'workbench-dev.html')),
+		workbenchProd: compileTemplate<WorkbenchTemplate>(join(WORKBENCH_PATH, 'workbench.html')),
 		callback: readFileSync(join(APP_ROOT, 'resources', 'web', 'callback.html')).toString(),
 	};
 
@@ -188,7 +200,13 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 			return this.serveError(req, res, 500, 'Internal Server Error.');
 		}
 
-		return this.serveError(req, res, 404, `"${req.parsedUrl.pathname}" not found.`);
+		const message = `"${req.parsedUrl.pathname}" not found.`;
+		const error = FileSystemError.FileNotFound(message);
+		if (this.options.disableFallbackRoute) {
+			req.emit('error', error);
+		} else {
+			return this.serveError(req, res, 404, message);
+		}
 	};
 
 	/**
@@ -370,6 +388,9 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 		return this.serveFile(join(paths.WEBVIEW, params[0]), req, res);
 	};
 
+	/**
+	 * @TODO Consider replacing with FileService.
+	 */
 	serveFile = async (filePath: string, req: IncomingMessage, res: ServerResponse): Promise<void> => {
 		const responseHeaders = Object.create(null);
 
@@ -460,8 +481,9 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 	constructor(
 		netServer: Server,
 		themeService: IServerThemeService,
-		@IEnvironmentServerService environmentService: IEnvironmentServerService,
-		@ILogService logService: ILogService,
+		environmentService: IEnvironmentServerService,
+		logService: ILogService,
+		private options: RequestHandlerOptions = {},
 	) {
 		super(netServer, environmentService, logService);
 		this.themeService = themeService;

@@ -52,6 +52,7 @@ export const main = async () => {
  */
 export const createVSServer: CodeServerLib.CreateVSServer = async serverConfig => {
 	enableCustomMarketplace(product);
+
 	const codeServer = new ServerProcessMain(serverConfig);
 
 	return codeServer.startup({ listenWhenReady: false });

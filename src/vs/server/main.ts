@@ -116,13 +116,13 @@ export class ServerProcessMain extends Disposable implements IServerProcessMain 
 		process.once('exit', () => this.dispose());
 	}
 
-	public async startup({ listenWhenReady = true }: IServerProcessMainStartupOptions = {}): Promise<NetServer> {
+	public async startup(startupOptions: IServerProcessMainStartupOptions = { listenWhenReady: true }): Promise<NetServer> {
 		// Services
 		const {
 			instantiationService,
 			initializeSpdLogger,
 			logService,
-		} = await this.createServices();
+		} = await this.createServices(startupOptions);
 
 		// Log info
 		logService.trace('Server configuration', JSON.stringify(this.configuration));
@@ -139,7 +139,7 @@ export class ServerProcessMain extends Disposable implements IServerProcessMain 
 		initializeSpdLogger();
 
 		// Listen for incoming connections
-		if (listenWhenReady) {
+		if (startupOptions.listenWhenReady) {
 			const { serverUrl } = this.configuration;
 
 			await listen(this.netServer, parseInt(serverUrl.port, 10), serverUrl.hostname);
@@ -152,7 +152,7 @@ export class ServerProcessMain extends Disposable implements IServerProcessMain 
 	// References:
 	// ../../electron-browser/sharedProcess/sharedProcessMain.ts#L148
 	// ../../../code/electron-main/app.ts
-	public async createServices(): Promise<ServicesResult> {
+	public async createServices(startupOptions: IServerProcessMainStartupOptions): Promise<ServicesResult> {
 		const services = new ServiceCollection();
 
 		// Product
@@ -252,7 +252,12 @@ export class ServerProcessMain extends Disposable implements IServerProcessMain 
 		services.set(INLSExtensionScannerService, extensionScannerService);
 
 		// Themes
-		const serverThemeService = new ServerThemeService(extensionScannerService, logService, configurationService, extensionResourceLoaderService);
+		const serverThemeService = new ServerThemeService(
+			extensionScannerService,
+			logService,
+			configurationService,
+			extensionResourceLoaderService,
+		);
 		await serverThemeService.initialize();
 		services.set(IServerThemeService, serverThemeService);
 
@@ -260,11 +265,21 @@ export class ServerProcessMain extends Disposable implements IServerProcessMain 
 		services.set(ILocalizationsService, new SyncDescriptor(LocalizationsService));
 
 		// Web
-		const webSocketServerService = new WebSocketServerService(this.netServer, environmentServerService, logService);
+		const webSocketServerService = new WebSocketServerService(
+			this.netServer,
+			environmentServerService,
+			logService,
+		);
 		webSocketServerService.listen();
 		services.set(IWebSocketServerService, webSocketServerService);
 
-		const incomingHTTPRequestService = new IncomingHTTPRequestService(this.netServer, serverThemeService, environmentServerService, logService);
+		const incomingHTTPRequestService = new IncomingHTTPRequestService(
+			this.netServer,
+			serverThemeService,
+			environmentServerService,
+			logService,
+			{ disableFallbackRoute: !startupOptions.listenWhenReady },
+		);
 		incomingHTTPRequestService.listen();
 		services.set(IIncomingHTTPRequestService, incomingHTTPRequestService);
 
