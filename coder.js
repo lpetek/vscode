@@ -28,7 +28,13 @@ const vscodeEntryPoints = _.flatten([
 
 // See ./build/gulpfile.vscode.js
 const vscodeResources = [
-	'out-build/vs/server/fork.js',
+	'out-build/vs/code/**/*',
+	'out-build/vs/base/**/*',
+	'out-build/vs/common/**/*',
+	'out-build/vs/platform/**/*',
+	'out-build/vs/workbench/**/*',
+	'out-build/vs/server/**/*',
+	'out-build/vs/editor/**/*',
 	'!out-build/vs/server/doc/**',
 	'out-build/vs/workbench/services/extensions/worker/extensionHostWorkerMain.js',
 	'out-build/bootstrap.js',
@@ -36,19 +42,8 @@ const vscodeResources = [
 	'out-build/bootstrap-amd.js',
 	'out-build/bootstrap-node.js',
 	'out-build/vs/**/*.{svg,png,html,ttf,jpg}',
-	'!out-build/vs/code/browser/workbench/*.html',
-	'!out-build/vs/code/electron-browser/**',
-	'out-build/vs/base/common/performance.js',
-	'out-build/vs/base/node/languagePacks.js',
-	'out-build/vs/base/browser/ui/codicons/codicon/**',
-	'out-build/vs/base/node/userDataPath.js',
-	'out-build/vs/workbench/browser/media/*-theme.css',
-	'out-build/vs/workbench/contrib/debug/**/*.json',
-	'out-build/vs/workbench/contrib/externalTerminal/**/*.scpt',
-	'out-build/vs/workbench/contrib/webview/browser/pre/*.js',
 	'out-build/vs/**/markdown.css',
 	'out-build/vs/workbench/contrib/tasks/**/*.json',
-	'out-build/vs/platform/files/**/*.md',
 	'!**/test/**'
 ];
 
