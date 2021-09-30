@@ -211,11 +211,15 @@ export class IncomingHTTPRequestService extends AbstractIncomingRequestService<W
 	private $webManifest: WebRequestListener = async (req, res) => {
 		const { productConfiguration } = await this.environmentService.createWorkbenchWebConfiguration(req);
 		const clientTheme = await this.fetchClientTheme();
+		const startUrl = req.pathPrefix.substring(
+			0,
+			req.pathPrefix.lastIndexOf('/') + 1
+		);
 
 		const webManifest: WebManifest = {
 			name: productConfiguration.nameLong!,
 			short_name: productConfiguration.nameShort!,
-			start_url: req.pathPrefix,
+			start_url: normalize(startUrl),
 			display: 'fullscreen',
 			'background-color': clientTheme.backgroundColor,
 			description: 'Run editors on a remote server.',
