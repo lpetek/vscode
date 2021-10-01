@@ -109,6 +109,10 @@ export class EnvironmentServerService extends NativeEnvironmentService implement
 					sizes: '512x512',
 				},
 			],
+
+			// Proxy
+			/** The URL constructor should be decoded here to retain the port template variable. */
+			proxyEndpointUrlTemplate: decodeURI(this.createRequestUrl(req, AssetPaths.ProxyUri).toString()),
 		};
 
 		if (!this.configuration.disableUpdateCheck) {

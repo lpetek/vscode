@@ -5,11 +5,11 @@
 
 import * as http from 'http';
 import * as net from 'net';
-import * as path from 'path';
 import { Disposable } from 'vs/base/common/lifecycle';
 import { createDecorator } from 'vs/platform/instantiation/common/instantiation';
 import { ILogService } from 'vs/platform/log/common/log';
 import { IEnvironmentServerService } from 'vs/server/services/environmentService';
+import { getPathPrefix } from 'vs/server/services/net/common/http';
 
 export interface ParsedRequest extends http.IncomingMessage {
 	parsedUrl: URL;
@@ -40,7 +40,7 @@ export abstract class AbstractIncomingRequestService<E extends NetEventListener>
 
 		Object.assign(req, {
 			parsedUrl,
-			pathPrefix: path.join(path.dirname(parsedUrl.pathname), '/'),
+			pathPrefix: getPathPrefix(parsedUrl.pathname),
 		});
 
 		this.eventListener(req as ParsedRequest, ...args);

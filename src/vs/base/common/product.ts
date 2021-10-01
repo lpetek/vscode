@@ -36,6 +36,7 @@ export interface IProductConfiguration {
 	readonly codeServerVersion?: string;
 	readonly authed?: boolean;
 	readonly logoutEndpointUrl: string;
+	readonly proxyEndpointUrlTemplate?: string;
 	readonly serviceWorker?: {
 		readonly url: string;
 		readonly scope: string;

@@ -66,7 +66,6 @@ import { HTMLFileSystemProvider } from 'vs/platform/files/browser/htmlFileSystem
 import { IOpenerService } from 'vs/platform/opener/common/opener';
 import { safeStringify } from 'vs/base/common/objects';
 import { CodeServerClientAdditions } from './client';
-import { isWeb } from 'vs/base/common/platform';
 
 class BrowserMain extends Disposable {
 
@@ -100,17 +99,14 @@ class BrowserMain extends Disposable {
 		const instantiationService = workbench.startup();
 
 
-		if (isWeb) {
-			/** @coder Initialize our own client-side additions. */
-			if (!this.configuration.productConfiguration) {
-				throw new Error('`productConfiguration` not present in workbench config');
-			}
-
-			const codeServerClientAdditions = this._register(instantiationService.createInstance(CodeServerClientAdditions, this.configuration.productConfiguration));
-
-			await codeServerClientAdditions.startup();
+		/** @coder Initialize our own client-side additions. */
+		if (!this.configuration.productConfiguration) {
+			throw new Error('`productConfiguration` not present in workbench config');
 		}
 
+		const codeServerClientAdditions = this._register(instantiationService.createInstance(CodeServerClientAdditions, this.configuration.productConfiguration));
+
+		await codeServerClientAdditions.startup();
 
 		// Window
 		this._register(instantiationService.createInstance(BrowserWindow));
@@ -183,7 +179,12 @@ class BrowserMain extends Disposable {
 
 		// Remote
 		const connectionToken = environmentService.options.connectionToken || getCookieValue('vscode-tkn');
-		const remoteAuthorityResolverService = new RemoteAuthorityResolverService(connectionToken, this.configuration.resourceUriProvider);
+		const remoteAuthorityResolverService = new RemoteAuthorityResolverService(
+			connectionToken,
+			this.configuration.resourceUriProvider,
+			/** @coder */
+			this.configuration.productConfiguration?.proxyEndpointUrlTemplate,
+		);
 		serviceCollection.set(IRemoteAuthorityResolverService, remoteAuthorityResolverService);
 
 		// Signing

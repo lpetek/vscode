@@ -7,7 +7,7 @@ import { Emitter } from 'vs/base/common/event';
 import { Disposable } from 'vs/base/common/lifecycle';
 import { RemoteAuthorities } from 'vs/base/common/network';
 import { URI } from 'vs/base/common/uri';
-import { IRemoteAuthorityResolverService, IRemoteConnectionData, ResolvedAuthority, ResolverResult } from 'vs/platform/remote/common/remoteAuthorityResolver';
+import { IRemoteAuthorityResolverService, IRemoteConnectionData, ResolvedAuthority, ResolvedOptions, ResolverResult } from 'vs/platform/remote/common/remoteAuthorityResolver';
 
 export class RemoteAuthorityResolverService extends Disposable implements IRemoteAuthorityResolverService {
 
@@ -20,7 +20,11 @@ export class RemoteAuthorityResolverService extends Disposable implements IRemot
 	private readonly _connectionToken: string | undefined;
 	private readonly _connectionTokens: Map<string, string>;
 
-	constructor(connectionToken: string | undefined, resourceUriProvider: ((uri: URI) => URI) | undefined) {
+	constructor(
+		connectionToken: string | undefined,
+		resourceUriProvider: ((uri: URI) => URI) | undefined,
+		/** @coder */
+		private readonly proxyEndpointUrlTemplate?: string,) {
 		super();
 		this._cache = new Map<string, ResolverResult>();
 		this._connectionToken = connectionToken;
@@ -59,11 +63,34 @@ export class RemoteAuthorityResolverService extends Disposable implements IRemot
 
 	private _doResolveAuthority(authority: string): ResolverResult {
 		const connectionToken = this._connectionTokens.get(authority) || this._connectionToken;
+		let host = authority;
+		let port = 80;
+		let options: ResolvedOptions | undefined;
+
 		if (authority.indexOf(':') >= 0) {
 			const pieces = authority.split(':');
-			return { authority: { authority, host: pieces[0], port: parseInt(pieces[1], 10), connectionToken } };
+			host = pieces[0];
+			port = parseInt(pieces[1], 10);
 		}
-		return { authority: { authority, host: authority, port: 80, connectionToken } };
+
+		/** @coder */
+		if (this.proxyEndpointUrlTemplate) {
+			options = {
+				extensionHostEnv: {
+					VSCODE_PROXY_URI: this.proxyEndpointUrlTemplate,
+				},
+			};
+		}
+
+		return {
+			authority: {
+				authority,
+				host,
+				port,
+				connectionToken,
+			},
+			options,
+		};
 	}
 
 	_clearResolvedAuthority(authority: string): void {

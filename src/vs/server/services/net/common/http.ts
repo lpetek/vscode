@@ -6,22 +6,23 @@
 import { randomBytes } from 'crypto';
 import { readFileSync } from 'fs';
 import { ServerResponse } from 'http';
-import { join } from 'path';
+import * as path from 'path';
 import { MatchResult } from 'path-to-regexp';
 import { UriComponents } from 'vs/base/common/uri';
 import { ParsedRequest } from 'vs/server/services/net/abstractIncomingRequestService';
 import * as Handlebars from 'handlebars';
 import { IWorkbenchConfigurationSerialized } from 'vs/platform/workspaces/common/workbench';
 
-export const APP_ROOT = join(__dirname, '..', '..', '..', '..', '..', '..');
-export const WORKBENCH_PATH = join(APP_ROOT, 'out', 'vs', 'code', 'browser', 'workbench');
+export const APP_ROOT = path.join(__dirname, '..', '..', '..', '..', '..', '..');
+export const WORKBENCH_PATH = path.join(APP_ROOT, 'out', 'vs', 'code', 'browser', 'workbench');
 export const SERVICE_WORKER_FILE_NAME = 'service-worker.js';
 
 export const AssetPaths = {
 	StaticBase: '/static',
-	Webview: join(APP_ROOT, 'out', 'vs', 'workbench', 'contrib', 'webview', 'browser', 'pre'),
-	Favicon: join(APP_ROOT, 'resources', 'web', 'favicon.ico'),
-	ServiceWorker: join(APP_ROOT, 'out', 'vs', 'code', 'browser', 'workbench', SERVICE_WORKER_FILE_NAME),
+	ProxyUri: '/proxy/{port}',
+	Webview: path.join(APP_ROOT, 'out', 'vs', 'workbench', 'contrib', 'webview', 'browser', 'pre'),
+	Favicon: path.join(APP_ROOT, 'resources', 'web', 'favicon.ico'),
+	ServiceWorker: path.join(APP_ROOT, 'out', 'vs', 'code', 'browser', 'workbench', SERVICE_WORKER_FILE_NAME),
 };
 
 /** Matching the given keys in `PollingURLCallbackProvider.QUERY_KEYS` */
@@ -141,4 +142,19 @@ export interface WorkbenchErrorTemplate extends BaseWorkbenchTemplate {
 export interface ClientTheme {
 	backgroundColor: string;
 	foregroundColor: string;
+}
+
+/**
+ * Returns the relative path prefix for a given URL path.
+ * @remark This is especially useful when creating URLs which have to remain
+ * relative to an initial request.
+ *
+ * @example
+ * ```ts
+ * const url = new URL('https://www.example.com/foo/bar/baz.js')
+ * getPathPrefix(url.pathname) // '/foo/bar/'
+ * ```
+ */
+export function getPathPrefix(pathname: string) {
+	return path.join(path.dirname(pathname), '/');
 }
