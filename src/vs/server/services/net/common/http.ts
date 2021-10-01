@@ -144,6 +144,8 @@ export interface ClientTheme {
 	foregroundColor: string;
 }
 
+export const ICON_SIZES = [192, 512];
+
 /**
  * Returns the relative path prefix for a given URL path.
  * @remark This is especially useful when creating URLs which have to remain
