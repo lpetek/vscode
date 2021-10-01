@@ -6,7 +6,7 @@
 import * as os from 'os';
 import { Emitter, Event } from 'vs/base/common/event';
 import { IDisposable } from 'vs/base/common/lifecycle';
-import { cloneAndChange } from 'vs/base/common/objects';
+import { cloneAndChange, deepClone } from 'vs/base/common/objects';
 import { IProcessEnvironment } from 'vs/base/common/platform';
 import { URI } from 'vs/base/common/uri';
 import { IURITransformer, transformIncomingURIs } from 'vs/base/common/uriIpc';
@@ -143,7 +143,7 @@ export class TerminalProviderChannel implements IServerChannel<RemoteAgentConnec
 		);
 
 		const processEnv: IProcessEnvironment = {
-			...process.env,
+			...deepClone(process.env),
 			...(resolverEnv || {}),
 			VSCODE_IPC_HOOK_CLI: cliServer.ipcHandlePath,
 		};
