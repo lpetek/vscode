@@ -82,6 +82,7 @@ import { ILifecycleService, NullLifecycleService } from 'vs/workbench/services/l
 import { REMOTE_FILE_SYSTEM_CHANNEL_NAME } from 'vs/workbench/services/remote/common/remoteAgentFileSystemChannel';
 import { IUriIdentityService } from 'vs/workbench/services/uriIdentity/common/uriIdentity';
 import { UriIdentityService } from 'vs/workbench/services/uriIdentity/common/uriIdentityService';
+import { enableCustomMarketplace } from 'vs/base/node/marketplace';
 
 interface IServerProcessMainStartupOptions {
 	listenWhenReady?: boolean;
@@ -109,6 +110,7 @@ export class ServerProcessMain extends Disposable implements IServerProcessMain 
 		// Enable gracefulFs
 		gracefulify(fs);
 
+		enableCustomMarketplace(product);
 		this.registerListeners();
 	}
 
