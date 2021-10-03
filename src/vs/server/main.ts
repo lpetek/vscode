@@ -267,6 +267,7 @@ export class ServerProcessMain extends Disposable implements IServerProcessMain 
 		// Web
 		const webSocketServerService = new WebSocketServerService(
 			this.netServer,
+			productService,
 			environmentServerService,
 			logService,
 		);

@@ -1,7 +1,10 @@
 import { SendHandle } from 'child_process';
 import { VSBuffer } from 'vs/base/common/buffer';
+import { Emitter, Event } from 'vs/base/common/event';
 import { FileAccess } from 'vs/base/common/network';
 import { findFreePort } from 'vs/base/node/ports';
+import { IMessagePassingProtocol } from 'vs/base/parts/ipc/common/ipc';
+import { PersistentProtocol } from 'vs/base/parts/ipc/common/ipc.net';
 import { IIPCOptions } from 'vs/base/parts/ipc/node/ipc.cp';
 import { ILogService } from 'vs/platform/log/common/log';
 import { DebugMessage, IRemoteExtensionHostStartParams } from 'vs/platform/remote/common/remoteAgentConnection';
@@ -9,7 +12,9 @@ import { AbstractConnection } from 'vs/server/connection/abstractConnection';
 import { ServerProtocol } from 'vs/server/protocol';
 import { IEnvironmentServerService } from 'vs/server/services/environmentService';
 import { parseExtensionDevOptions } from 'vs/workbench/services/extensions/common/extensionDevOptions';
-import { ExtensionHost } from 'vs/workbench/services/extensions/node/extensionHost';
+import { createMessageOfType, MessageType } from 'vs/workbench/services/extensions/common/extensionHostProtocol';
+import { ExtensionHostKind, IExtensionHost } from 'vs/workbench/services/extensions/common/extensions';
+import { ExtensionHostProcess } from 'vs/workbench/services/extensions/node/extensionHost';
 import { getCachedNlsConfiguration } from 'vs/workbench/services/extensions/node/nls';
 
 /**
@@ -32,9 +37,19 @@ export interface ForkEnvironmentVariables {
 
 /**
  * This complements the client-side `PersistantConnection` in `RemoteExtensionHost`.
+ * @see `LocalProcessExtensionHost`
  */
-export class ExtensionHostConnection extends AbstractConnection {
-	private clientProcess?: ExtensionHost;
+export class ExtensionHostConnection extends AbstractConnection implements IExtensionHost {
+	public readonly kind = ExtensionHostKind.LocalProcess;
+	public readonly remoteAuthority = null;
+	public readonly lazyStart = false;
+	private _terminating = false;
+
+	private readonly _onExit: Emitter<[number, string]> = new Emitter<[number, string]>();
+	public readonly onExit: Event<[number, string]> = this._onExit.event;
+	private _messageProtocol: Promise<PersistentProtocol> | null = null;
+
+	private clientProcess?: ExtensionHostProcess;
 
 	/** @TODO Document usage. */
 	public readonly _isExtensionDevHost: boolean;
@@ -79,6 +94,16 @@ export class ExtensionHostConnection extends AbstractConnection {
 		}
 
 		return port || 0;
+	}
+
+	/** @TODO implement. */
+	public getInspectPort(): number | undefined {
+		return undefined;
+	}
+
+	/** @TODO implement. */
+	public enableInspectPort(): Promise<boolean> {
+		return Promise.resolve(false);
 	}
 
 	protected doDispose(): void {
@@ -161,12 +186,27 @@ export class ExtensionHostConnection extends AbstractConnection {
 		};
 	}
 
+	private _onExtHostProcessExit(code: number, signal: string): void {
+		this.dispose();
+
+		if (code !== 0 && signal !== 'SIGTERM') {
+			this.logService.error(`${this.logPrefix} Extension host exited with code: ${code} and signal: ${signal}.`);
+		}
+
+		if (this._terminating) {
+			// Expected termination path (we asked the process to terminate)
+			return;
+		}
+
+		this._onExit.fire([code, signal]);
+	}
+
 	/**
 	 * Creates an extension host child process.
 	 * @remark this is very similar to `LocalProcessExtensionHost`
 	 */
-	public spawn(): Promise<void> {
-		return new Promise(async (resolve, reject) => {
+	public start(): Promise<IMessagePassingProtocol> {
+		this._messageProtocol = new Promise(async (resolve, reject) => {
 			this.logService.debug(this.logPrefix, '(Spawn 1/7)', 'Sending client initial debug message.');
 			this.protocol.sendMessage(this.debugMessage);
 
@@ -178,14 +218,10 @@ export class ExtensionHostConnection extends AbstractConnection {
 			const clientOptions = await this.generateClientOptions();
 
 			this.logService.debug(this.logPrefix, '(Spawn 4/7)', 'Starting extension host child process...');
-			this.clientProcess = new ExtensionHost(FileAccess.asFileUri('bootstrap-fork', require).fsPath, clientOptions);
+			this.clientProcess = new ExtensionHostProcess(FileAccess.asFileUri('bootstrap-fork', require).fsPath, clientOptions);
 
-			this.clientProcess.onDidProcessExit(({ code, signal }) => {
-				this.dispose();
-
-				if (code !== 0 && signal !== 'SIGTERM') {
-					this.logService.error(`${this.logPrefix} Extension host exited with code: ${code} and signal: ${signal}.`);
-				}
+			this.clientProcess.onDidProcessExit(([code, signal]) => {
+				this._onExtHostProcessExit(code, signal);
 			});
 
 			this.clientProcess.onReady(() => {
@@ -195,11 +231,53 @@ export class ExtensionHostConnection extends AbstractConnection {
 
 				if (messageSent) {
 					this.logService.debug(this.logPrefix, '(Spawn 7/7)', 'Child process received init message!');
-					return resolve();
+					return resolve(this.protocol);
 				}
 
 				reject(new Error('Child process did not receive init message. Is their a backlog?'));
 			});
 		});
+
+		return this._messageProtocol;
+	}
+
+	public terminate(): void {
+		if (this._terminating) {
+			return;
+		}
+		this._terminating = true;
+
+		this.dispose();
+
+		if (!this._messageProtocol) {
+			// .start() was not called
+			return;
+		}
+
+		this._messageProtocol.then((protocol) => {
+
+			// Send the extension host a request to terminate itself
+			// (graceful termination)
+			protocol.send(createMessageOfType(MessageType.Terminate));
+
+			protocol.getSocket().dispose();
+
+			protocol.dispose();
+
+			// Give the extension host 10s, after which we will
+			// try to kill the process and release any resources
+			setTimeout(() => this._cleanResources(), 10 * 1000);
+
+		}, (err) => {
+			// Establishing a protocol with the extension host failed, so
+			// try to kill the process and release any resources.
+			this._cleanResources();
+		});
+	}
+
+	private _cleanResources(): void {
+		if (this.clientProcess) {
+			this.clientProcess.dispose();
+		}
 	}
 }

@@ -12,14 +12,14 @@ import { ClientConnectionEvent } from 'vs/base/parts/ipc/common/ipc';
 import { NodeSocket, WebSocketNodeSocket } from 'vs/base/parts/ipc/node/ipc.net';
 import { refineServiceDecorator } from 'vs/platform/instantiation/common/instantiation';
 import { ILogService } from 'vs/platform/log/common/log';
-import product from 'vs/platform/product/common/product';
 import { ConnectionType, connectionTypeToString, IRemoteExtensionHostStartParams } from 'vs/platform/remote/common/remoteAgentConnection';
 import { ConnectionOptions, parseQueryConnectionOptions } from 'vs/server/connection/abstractConnection';
-import { ExtensionHostConnection } from 'vs/server/connection/extensionHostConnection';
+import { ExtensionHostConnection } from 'vs/server/services/extensions/extensionHostConnection';
 import { ManagementConnection } from 'vs/server/connection/managementConnection';
 import { ServerProtocol } from 'vs/server/protocol';
 import { AbstractIncomingRequestService, IAbstractIncomingRequestService, ParsedRequest } from 'vs/server/services/net/abstractIncomingRequestService';
 import { IEnvironmentServerService } from 'vs/server/services/environmentService';
+import { IProductService } from 'vs/platform/product/common/productService';
 
 type Connection = ExtensionHostConnection | ManagementConnection;
 
@@ -35,6 +35,8 @@ export const IWebSocketServerService = refineServiceDecorator<IAbstractIncomingR
  * Handles client connections to a editor instance via IPC.
  */
 export class WebSocketServerService extends AbstractIncomingRequestService<UpgradeListener> implements IWebSocketServerService {
+	productService: IProductService;
+
 	protected eventName = 'upgrade';
 	private readonly _onDidClientConnect = new Emitter<ClientConnectionEvent>();
 	public readonly onDidClientConnect = this._onDidClientConnect.event;
@@ -97,7 +99,7 @@ export class WebSocketServerService extends AbstractIncomingRequestService<Upgra
 		const message = await protocol.handshake();
 
 		const clientVersion = message.commit;
-		const serverVersion = product.commit;
+		const serverVersion = this.productService.commit;
 		if (serverVersion && clientVersion !== serverVersion) {
 			this.logService.warn(`Client version (${message.commit} does not match server version ${serverVersion})`);
 		}
@@ -153,8 +155,6 @@ export class WebSocketServerService extends AbstractIncomingRequestService<Upgra
 				};
 
 				connection = new ExtensionHostConnection(protocol, this.logService, startParams, this.environmentService);
-
-				await connection.spawn();
 				break;
 			case ConnectionType.Tunnel:
 				return protocol.tunnel();
@@ -178,10 +178,12 @@ export class WebSocketServerService extends AbstractIncomingRequestService<Upgra
 
 	constructor(
 		netServer: net.Server,
+		@IProductService productService: IProductService,
 		@IEnvironmentServerService environmentService: IEnvironmentServerService,
 		@ILogService logService: ILogService,
 	) {
 		super(netServer, environmentService, logService);
+		this.productService = productService;
 	}
 }
 

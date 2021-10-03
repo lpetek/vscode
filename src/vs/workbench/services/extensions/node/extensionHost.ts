@@ -17,9 +17,9 @@ export type ExtensionHostMessage = IRemoteConsoleLog | IExtHostReadyMessage;
 /**
  * Creates an extension host child process with a standard disposable interface.
  */
-export class ExtensionHost implements IDisposable {
+export class ExtensionHostProcess implements IDisposable {
 	private child: ChildProcess | null = null;
-	private readonly _onDidProcessExit = new Emitter<{ code: number; signal: string }>();
+	private readonly _onDidProcessExit = new Emitter<[number, string]>();
 	public readonly onDidProcessExit = this._onDidProcessExit.event;
 
 	private readonly _onReadyMessage = new Emitter<IExtHostReadyMessage>();
@@ -102,14 +102,13 @@ export class ExtensionHost implements IDisposable {
 
 		this.child.on('error', err => console.warn('IPC "' + this.options.serverName + '" errored with ' + err));
 
-		this.child.on('exit', (code: any, signal: any) => {
+		this.child.on('exit', (code: number, signal: string) => {
 			process.removeListener('exit' as 'loaded', onExit); // https://github.com/electron/electron/issues/21475
 
 			if (code !== 0 && signal !== 'SIGTERM') {
 				console.warn('IPC "' + this.options.serverName + '" crashed with exit code ' + code + ' and signal ' + signal);
 			}
-
-			this._onDidProcessExit.fire({ code, signal });
+			this._onDidProcessExit.fire([code, signal]);
 		});
 	}
 }
