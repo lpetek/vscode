@@ -8,17 +8,21 @@ import { onUnexpectedError } from 'vs/base/common/errors';
 import { MutableDisposable, toDisposable } from 'vs/base/common/lifecycle';
 import { IActiveCodeEditor } from 'vs/editor/browser/editorBrowser';
 import { EditorOption } from 'vs/editor/common/config/editorOptions';
-import { Range } from 'vs/editor/common/core/range';
-import { ITextModel } from 'vs/editor/common/model';
 import { InlineCompletionTriggerKind, SelectedSuggestionInfo } from 'vs/editor/common/modes';
 import { SharedInlineCompletionCache } from 'vs/editor/contrib/inlineCompletions/ghostTextModel';
 import { BaseGhostTextWidgetModel, GhostText } from './ghostText';
-import { provideInlineCompletions, UpdateOperation } from './inlineCompletionsModel';
+import { minimizeInlineCompletion, provideInlineCompletions, UpdateOperation } from './inlineCompletionsModel';
 import { inlineCompletionToGhostText, NormalizedInlineCompletion } from './inlineCompletionToGhostText';
 import { SuggestWidgetInlineCompletionProvider } from './suggestWidgetInlineCompletionProvider';
 
 export class SuggestWidgetPreviewModel extends BaseGhostTextWidgetModel {
-	private readonly suggestionInlineCompletionSource = this._register(new SuggestWidgetInlineCompletionProvider(this.editor));
+	private readonly suggestionInlineCompletionSource = this._register(
+		new SuggestWidgetInlineCompletionProvider(
+			this.editor,
+			// Use the first cache item (if any) as preselection.
+			() => this.cache.value?.completions[0]?.toLiveInlineCompletion()
+		)
+	);
 	private readonly updateOperation = this._register(new MutableDisposable<UpdateOperation>());
 	private readonly updateCacheSoon = this._register(new RunOnceScheduler(() => this.updateCache(), 50));
 

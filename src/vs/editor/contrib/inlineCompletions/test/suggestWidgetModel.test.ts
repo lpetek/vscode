@@ -6,23 +6,17 @@
 import { minimizeInlineCompletion, SuggestWidgetPreviewModel } from 'vs/editor/contrib/inlineCompletions/suggestWidgetPreviewModel';
 import { SuggestController } from 'vs/editor/contrib/suggest/suggestController';
 import { SnippetController2 } from 'vs/editor/contrib/snippet/snippetController2';
+import { SuggestController } from 'vs/editor/contrib/suggest/suggestController';
+import { ISuggestMemoryService } from 'vs/editor/contrib/suggest/suggestMemory';
+import { ITestCodeEditor, TestCodeEditorCreationOptions, withAsyncTestCodeEditor } from 'vs/editor/test/browser/testCodeEditor';
+import { IMenu, IMenuService } from 'vs/platform/actions/common/actions';
 import { ServiceCollection } from 'vs/platform/instantiation/common/serviceCollection';
-import { NullTelemetryService } from 'vs/platform/telemetry/common/telemetryUtils';
+import { IKeybindingService } from 'vs/platform/keybinding/common/keybinding';
+import { MockKeybindingService } from 'vs/platform/keybinding/test/common/mockKeybindingService';
 import { ILogService, NullLogService } from 'vs/platform/log/common/log';
 import { InMemoryStorageService, IStorageService } from 'vs/platform/storage/common/storage';
-import { MockKeybindingService } from 'vs/platform/keybinding/test/common/mockKeybindingService';
-import { mock } from 'vs/base/test/common/mock';
-import { IEditorWorkerService } from 'vs/editor/common/services/editorWorkerService';
-import { ISuggestMemoryService } from 'vs/editor/contrib/suggest/suggestMemory';
-import { IMenuService, IMenu } from 'vs/platform/actions/common/actions';
-import { IKeybindingService } from 'vs/platform/keybinding/common/keybinding';
 import { ITelemetryService } from 'vs/platform/telemetry/common/telemetry';
-import { timeout } from 'vs/base/common/async';
-import { DisposableStore } from 'vs/base/common/lifecycle';
-import { CompletionItemKind, CompletionItemProvider, CompletionProviderRegistry } from 'vs/editor/common/modes';
-import { ViewModel } from 'vs/editor/common/viewModel/viewModelImpl';
-import { TestCodeEditorCreationOptions, ITestCodeEditor, withAsyncTestCodeEditor } from 'vs/editor/test/browser/testCodeEditor';
-import { Event } from 'vs/base/common/event';
+import { NullTelemetryService } from 'vs/platform/telemetry/common/telemetryUtils';
 import assert = require('assert');
 import { GhostTextContext } from 'vs/editor/contrib/inlineCompletions/test/utils';
 import { Range } from 'vs/editor/common/core/range';
@@ -149,7 +143,9 @@ async function withAsyncTestCodeEditorAndInlineCompletionsModel(
 							override dispose() { }
 						};
 					}
-				}]
+				}],
+				[ILabelService, new class extends mock<ILabelService>() { }],
+				[IWorkspaceContextService, new class extends mock<IWorkspaceContextService>() { }],
 			);
 
 			if (options.provider) {

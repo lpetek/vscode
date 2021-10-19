@@ -159,6 +159,7 @@ export interface IAppCenterConfiguration {
 export interface IConfigBasedExtensionTip {
 	configPath: string;
 	configName: string;
+	configScheme?: string;
 	recommendations: IStringDictionary<{ name: string, remotes?: string[], important?: boolean, isExtensionPack?: boolean }>;
 }
 

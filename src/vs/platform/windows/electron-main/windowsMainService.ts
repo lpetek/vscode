@@ -275,10 +275,9 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 			}
 		}
 
-		// When run with --diff, take the files to open as files to diff
-		// if there are exactly two files provided.
-		if (openConfig.diffMode && filesToOpen?.filesToOpenOrCreate.length === 2) {
-			filesToOpen.filesToDiff = filesToOpen.filesToOpenOrCreate;
+		// When run with --diff, take the first 2 files to open as files to diff
+		if (openConfig.diffMode && filesToOpen && filesToOpen.filesToOpenOrCreate.length >= 2) {
+			filesToOpen.filesToDiff = filesToOpen.filesToOpenOrCreate.slice(0, 2);
 			filesToOpen.filesToOpenOrCreate = [];
 		}
 
@@ -1256,6 +1255,7 @@ export class WindowsMainService extends Disposable implements IWindowsMainServic
 			os: { release: release(), hostname: hostname() },
 			zoomLevel: typeof windowConfig?.zoomLevel === 'number' ? windowConfig.zoomLevel : undefined,
 
+			enableLegacyRecursiveWatcher: this.configurationService.getValue('files.legacyWatcher'),
 			autoDetectHighContrast: windowConfig?.autoDetectHighContrast ?? true,
 			accessibilitySupport: app.accessibilitySupportEnabled,
 			colorScheme: {

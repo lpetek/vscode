@@ -32,8 +32,8 @@ suite('ExtensionManifestPropertiesService - ExtensionKind', () => {
 		assert.deepStrictEqual(testObject.getExtensionKind(<IExtensionManifest>{ extensionPack: ['ext1', 'ext2'], extensionDependencies: ['ext1', 'ext2'] }), ['workspace', 'web']);
 	});
 
-	test('declarative with unknown contribution point => workspace, web', () => {
-		assert.deepStrictEqual(testObject.getExtensionKind(<IExtensionManifest>{ contributes: <any>{ 'unknownPoint': { something: true } } }), ['workspace', 'web']);
+	test('declarative with unknown contribution point => workspace, web in web and => workspace in desktop', () => {
+		assert.deepStrictEqual(testObject.getExtensionKind(<IExtensionManifest>{ contributes: <any>{ 'unknownPoint': { something: true } } }), isWeb ? ['workspace', 'web'] : ['workspace']);
 	});
 
 	test('declarative extension pack with unknown contribution point', () => {
@@ -52,12 +52,16 @@ suite('ExtensionManifestPropertiesService - ExtensionKind', () => {
 		assert.deepStrictEqual(testObject.getExtensionKind(<IExtensionManifest>{ main: 'main.js' }), ['workspace']);
 	});
 
-	test('main and browser => workspace, web', () => {
-		assert.deepStrictEqual(testObject.getExtensionKind(<IExtensionManifest>{ main: 'main.js', browser: 'main.browser.js' }), ['workspace', 'web']);
+	test('main and browser => workspace, web in web and workspace in desktop', () => {
+		assert.deepStrictEqual(testObject.getExtensionKind(<IExtensionManifest>{ main: 'main.js', browser: 'main.browser.js' }), isWeb ? ['workspace', 'web'] : ['workspace']);
 	});
 
-	test('browser entry point with workspace extensionKind => workspace, web', () => {
-		assert.deepStrictEqual(testObject.getExtensionKind(<IExtensionManifest>{ main: 'main.js', browser: 'main.browser.js', extensionKind: ['workspace'] }), ['workspace', 'web']);
+	test('browser entry point with workspace extensionKind => workspace, web in web and workspace in desktop', () => {
+		assert.deepStrictEqual(testObject.getExtensionKind(<IExtensionManifest>{ main: 'main.js', browser: 'main.browser.js', extensionKind: ['workspace'] }), isWeb ? ['workspace', 'web'] : ['workspace']);
+	});
+
+	test('only browser entry point with out extensionKind => web', () => {
+		assert.deepStrictEqual(testObject.getExtensionKind(<IExtensionManifest>{ browser: 'main.browser.js' }), ['web']);
 	});
 
 	test('only browser entry point with out extensionKind => web', () => {

@@ -102,7 +102,7 @@ export const startEntries: GettingStartedStartEntryContent = [
 		title: localize('gettingStarted.openFolder.title', "Open Folder..."),
 		description: localize('gettingStarted.openFolder.description', "Open a folder to start working"),
 		icon: Codicon.folderOpened,
-		when: '!isWeb && !isMac',
+		when: '!isWeb',
 		content: {
 			type: 'startEntry',
 			command: 'workbench.action.files.openFolder',
@@ -261,9 +261,9 @@ export const walkthroughs: GettingStartedWalkthroughContent = [
 				{
 					id: 'playground',
 					title: localize('gettingStarted.playground.title', "Redefine your editing skills"),
-					description: localize('gettingStarted.playground.description.interpolated', "Want to code faster and smarter? Practice powerful code editing features in the interactive playground.\n{0}", Button(localize('openInteractivePlayground', "Open Interactive Playground"), 'command:toSide:workbench.action.showInteractivePlayground')),
+					description: localize('gettingStarted.playground.description.interpolated', "Want to code faster and smarter? Practice powerful code editing features in the interactive playground.\n{0}", Button(localize('openEditorPlayground', "Open Editor Playground"), 'command:toSide:workbench.action.showInteractivePlayground')),
 					media: {
-						type: 'svg', altText: 'Interactive Playground.', path: 'interactivePlayground.svg'
+						type: 'svg', altText: 'Editor Playground.', path: 'interactivePlayground.svg'
 					},
 				},
 				{
