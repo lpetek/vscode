@@ -36,7 +36,6 @@ declare namespace self {
 	let importScripts: any;
 	let fetch: _Fetch;
 	let XMLHttpRequest: any;
-	let trustedTypes: any;
 }
 
 const nativeClose = self.close.bind(self);

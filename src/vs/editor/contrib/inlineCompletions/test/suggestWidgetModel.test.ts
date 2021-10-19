@@ -3,18 +3,8 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { timeout } from 'vs/base/common/async';
-import { Event } from 'vs/base/common/event';
-import { DisposableStore } from 'vs/base/common/lifecycle';
-import { mock } from 'vs/base/test/common/mock';
-import { runWithFakedTimers } from 'vs/base/test/common/timeTravelScheduler';
-import { Range } from 'vs/editor/common/core/range';
-import { CompletionItemKind, CompletionItemProvider, CompletionProviderRegistry } from 'vs/editor/common/modes';
-import { IEditorWorkerService } from 'vs/editor/common/services/editorWorkerService';
-import { ViewModel } from 'vs/editor/common/viewModel/viewModelImpl';
-import { SharedInlineCompletionCache } from 'vs/editor/contrib/inlineCompletions/ghostTextModel';
-import { SuggestWidgetPreviewModel } from 'vs/editor/contrib/inlineCompletions/suggestWidgetPreviewModel';
-import { GhostTextContext } from 'vs/editor/contrib/inlineCompletions/test/utils';
+import { minimizeInlineCompletion, SuggestWidgetPreviewModel } from 'vs/editor/contrib/inlineCompletions/suggestWidgetPreviewModel';
+import { SuggestController } from 'vs/editor/contrib/suggest/suggestController';
 import { SnippetController2 } from 'vs/editor/contrib/snippet/snippetController2';
 import { SuggestController } from 'vs/editor/contrib/suggest/suggestController';
 import { ISuggestMemoryService } from 'vs/editor/contrib/suggest/suggestMemory';
@@ -28,10 +18,11 @@ import { InMemoryStorageService, IStorageService } from 'vs/platform/storage/com
 import { ITelemetryService } from 'vs/platform/telemetry/common/telemetry';
 import { NullTelemetryService } from 'vs/platform/telemetry/common/telemetryUtils';
 import assert = require('assert');
+import { GhostTextContext } from 'vs/editor/contrib/inlineCompletions/test/utils';
+import { Range } from 'vs/editor/common/core/range';
+import { runWithFakedTimers } from 'vs/base/test/common/timeTravelScheduler';
+import { SharedInlineCompletionCache } from 'vs/editor/contrib/inlineCompletions/ghostTextModel';
 import { createTextModel } from 'vs/editor/test/common/editorTestUtils';
-import { ILabelService } from 'vs/platform/label/common/label';
-import { IWorkspaceContextService } from 'vs/platform/workspace/common/workspace';
-import { minimizeInlineCompletion } from 'vs/editor/contrib/inlineCompletions/inlineCompletionsModel';
 
 suite('Suggest Widget Model', () => {
 	test('Active', async () => {

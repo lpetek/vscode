@@ -147,16 +147,8 @@ export class LanguageDetectionSimpleWorker extends EditorSimpleWorker {
 		}
 
 		let modelResults: ModelResult[] | undefined;
-		// Grab the first 10000 characters
-		const end = model.positionAt(10000);
-		const content = model.getValueInRange({
-			startColumn: 1,
-			startLineNumber: 1,
-			endColumn: end.column,
-			endLineNumber: end.lineNumber
-		});
 		try {
-			modelResults = await modelOperations.runModel(content);
+			modelResults = await modelOperations.runModel(content.getValue());
 		} catch (e) {
 			console.warn(e);
 		}

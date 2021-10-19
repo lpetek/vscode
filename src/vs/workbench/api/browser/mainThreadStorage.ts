@@ -64,7 +64,17 @@ export class MainThreadStorage implements MainThreadStorageShape {
 	}
 
 	async $setValue(shared: boolean, key: string, value: object): Promise<void> {
-		this._storageService.store(key, JSON.stringify(value), shared ? StorageScope.GLOBAL : StorageScope.WORKSPACE, StorageTarget.MACHINE /* Extension state is synced separately through extensions */);
+		let jsonValue: string;
+		try {
+			jsonValue = JSON.stringify(value);
+			// Extension state is synced separately through extensions
+			// NOTE@coder: Wait for the actual storage write.
+			await this._storageService.store(key, jsonValue, shared ? StorageScope.GLOBAL : StorageScope.WORKSPACE, StorageTarget.MACHINE);
+		} catch (err) {
+			return Promise.reject(err);
+		}
+		return Promise.resolve(undefined);
+
 	}
 
 	$registerExtensionStorageKeysToSync(extension: IExtensionIdWithVersion, keys: string[]): void {
