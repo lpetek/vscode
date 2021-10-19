@@ -147,7 +147,7 @@ const Button = (title: string, href: string) => `[${title}](${href})`;
 export const walkthroughs: GettingStartedWalkthroughContent = [
 	{
 		id: 'Setup',
-		title: localize('gettingStarted.setup.title', "Get Started with VS Code"),
+		title: localize('gettingStarted.setup.title', "Designed with speed in mind."),
 		description: localize('gettingStarted.setup.description', "Discover the best customizations to make VS Code yours."),
 		isFeatured: true,
 		icon: setupIcon,
