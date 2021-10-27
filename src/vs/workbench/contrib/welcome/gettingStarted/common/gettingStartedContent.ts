@@ -12,6 +12,7 @@ import { registerIcon } from 'vs/platform/theme/common/iconRegistry';
 import { OpenGettingStarted } from 'vs/workbench/contrib/notebook/common/notebookCommon';
 
 
+
 const setupIcon = registerIcon('getting-started-setup', Codicon.zap, localize('getting-started-setup-icon', "Icon used for the setup category of welcome page"));
 const beginnerIcon = registerIcon('getting-started-beginner', Codicon.lightbulb, localize('getting-started-beginner-icon', "Icon used for the beginner category of welcome page"));
 const intermediateIcon = registerIcon('getting-started-intermediate', Codicon.mortarBoard, localize('getting-started-intermediate-icon', "Icon used for the intermediate category of welcome page"));
@@ -141,14 +142,13 @@ export const startEntries: GettingStartedStartEntryContent = [
 		}
 	},
 ];
-
 const Button = (title: string, href: string) => `[${title}](${href})`;
 
 export const walkthroughs: GettingStartedWalkthroughContent = [
 	{
 		id: 'Setup',
 		title: localize('gettingStarted.setup.title', "Designed with speed in mind"),
-		description: localize('gettingStarted.setup.description', "DS"),
+		description: localize('gettingStarted.setup.description', "DS + terminal"),
 		isFeatured: true,
 		icon: setupIcon,
 		next: 'Beginner',

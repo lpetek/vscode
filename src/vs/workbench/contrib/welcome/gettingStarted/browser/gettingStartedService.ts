@@ -34,6 +34,7 @@ import { ITelemetryService } from 'vs/platform/telemetry/common/telemetry';
 import { checkGlobFileExists } from 'vs/workbench/api/common/shared/workspaceContains';
 import { IWorkspaceContextService } from 'vs/platform/workspace/common/workspace';
 import { CancellationTokenSource } from 'vs/base/common/cancellation';
+import { TerminalCommandId } from 'vs/workbench/contrib/terminal/common/terminal';
 
 export const HasMultipleNewFileEntries = new RawContextKey<boolean>('hasMultipleNewFileEntries', false);
 
@@ -159,9 +160,11 @@ export class WalkthroughsService extends Disposable implements IWalkthroughsServ
 		@IHostService private readonly hostService: IHostService,
 		@IViewsService private readonly viewsService: IViewsService,
 		@ITelemetryService private readonly telemetryService: ITelemetryService,
+		@ICommandService private readonly _commandService: ICommandService,
 		@optional(ITASExperimentService) tasExperimentService: ITASExperimentService,
 	) {
 		super();
+		this._commandService.executeCommand(TerminalCommandId.New);
 
 		this.tasExperimentService = tasExperimentService;
 
